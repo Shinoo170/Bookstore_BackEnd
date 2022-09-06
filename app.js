@@ -11,4 +11,13 @@ app.get('/', (req, res) => {
     })
 })
 
+app.get('/testAPI', (req,res) => {
+    res.status(200).json({
+        status: 200,
+        website: "Bookstore backend",
+        admin: "Shinoo",
+        admin2: "Seres"
+    })
+})
+
 module.exports = app;
