@@ -1,6 +1,6 @@
 const express = require('express')
 const router = express.Router()
-const verifySignUp = require('../middleware/verifySignUp')
+const verifySignUp = require('../middleware/verifySignup')
 const controller = require('../controllers/auth.controller')
 const authJwt = require('../middleware/authJwt')
 
