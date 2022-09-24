@@ -1,7 +1,7 @@
 const express = require('express')
 const app = express()
 const mongoUtil = require('./config/database')
-const auth = require('./router/auth.router')
+const auth = require('./routes/auth.router')
 
 app.use(express.json())
 
