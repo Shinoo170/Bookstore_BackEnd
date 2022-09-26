@@ -8,6 +8,7 @@ const url = process.env.MONGODB_URI + process.env.DB_NAME
 const baseUrl = process.env.BASE_URL_IMG
 
 const mongoClient = new MongoClient(url);
+const mongoUtil = require('./config/database')
 
 const uploadFiles = async (req, res) => {
   try {
@@ -34,9 +35,7 @@ const uploadFiles = async (req, res) => {
 
 const getListFiles = async (req, res) => {
   try {
-    await mongoClient.connect();
-
-    const database = mongoClient.db('bookstore');
+    const database = mongoUtil.getDb();
     const images = database.collection('photos' + ".files");
 
     const cursor = images.find({});
@@ -65,9 +64,7 @@ const getListFiles = async (req, res) => {
 
 const download = async (req, res) => {
   try {
-    await mongoClient.connect();
-
-    const database = mongoClient.db('bookstore');
+    const database = mongoUtil.getDb();
     const bucket = new GridFSBucket(database, {
       bucketName: 'photos',
     });
