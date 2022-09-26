@@ -8,7 +8,7 @@ const url = process.env.MONGODB_URI + process.env.DB_NAME
 const baseUrl = process.env.BASE_URL_IMG
 
 const mongoClient = new MongoClient(url);
-const mongoUtil = require('./config/database')
+const mongoUtil = require('../config/database')
 
 const uploadFiles = async (req, res) => {
   try {
