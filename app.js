@@ -2,7 +2,7 @@ const express = require('express')
 const app = express()
 const mongoUtil = require('./config/database')
 const auth = require('./routes/auth.router')
-const img = require('./router/img.router')
+const img = require('./routes/img.router')
 app.use(express.json())
 
 // [ connect to database ]
