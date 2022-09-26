@@ -2,7 +2,7 @@ const express = require('express')
 const app = express()
 const mongoUtil = require('./config/database')
 const auth = require('./routes/auth.router')
-
+const img = require('./router/img.router')
 app.use(express.json())
 
 // [ connect to database ]
@@ -28,5 +28,7 @@ app.get('/testAPI', (req,res) => {
 
 // [ authorization system ]
 app.use('/auth', auth)
+// [ get && upload image ]
+app.use('/img', img)
 
 module.exports = app;
