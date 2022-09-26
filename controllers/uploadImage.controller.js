@@ -36,11 +36,11 @@ const uploadFiles = async (req, res) => {
 const getListFiles = async (req, res) => {
   try {
     const database = mongoUtil.getDb();
-    const images = database.collection('photos' + ".files");
+    const images = database.collection('photos.files');
 
-    const cursor = images.find({});
+    const cursor = await images.find({});
 
-    if ((await cursor.count()) === 0) {
+    if ((await cursor.countDocuments()) === 0) {
       return res.status(500).send({
         message: "No files found!",
       });
