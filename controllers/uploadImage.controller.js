@@ -35,7 +35,9 @@ const uploadFiles = async (req, res) => {
 
 const getListFiles = async (req, res) => {
   try {
-    const database = mongoUtil.getDb();
+    await mongoClient.connect();
+    const database = mongoClient.db(dbConfig.database);
+    // const database = mongoUtil.getDb();
     const images = database.collection('photos.files');
 
     const cursor = await images.find({});
@@ -64,7 +66,9 @@ const getListFiles = async (req, res) => {
 
 const download = async (req, res) => {
   try {
-    const database = mongoUtil.getDb();
+    await mongoClient.connect();
+    const database = mongoClient.db(dbConfig.database);
+    // const database = mongoUtil.getDb();
     const bucket = new GridFSBucket(database, {
       bucketName: 'photos',
     });
