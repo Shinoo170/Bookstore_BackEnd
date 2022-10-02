@@ -35,6 +35,6 @@ app.use('/auth', auth)
 app.use('/product', product)
 
 // [ admin system ]
-app.use('/admin, admin')
+app.use('/admin', admin)
 
 module.exports = app;
