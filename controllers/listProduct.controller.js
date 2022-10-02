@@ -15,7 +15,7 @@ exports.getAllProduct = async (req, res) => {
             res.send(result)
         })
     }catch(err){
-        res.status(400).send({message: 'Error to get data'})
+        res.status(400).send({message: 'Error to get data', err})
     }
 }
 

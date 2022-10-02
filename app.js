@@ -2,6 +2,8 @@ const express = require('express')
 const app = express()
 const cors = require('cors')
 
+require('dotenv').config()
+
 // [ import all routes ]
 const mongoUtil = require('./config/database')
 const auth = require('./routes/auth.router')

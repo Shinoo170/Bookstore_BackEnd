@@ -1,7 +1,7 @@
 const mongoUtil = require('../config/database')
 const AWS = require("aws-sdk");
 
-const BASE_URL = process.env.AWS_URL
+const BASE_URL = process.env.AWS_S3_URL
   
 exports.addProduct = async (req, res) => {
     try {
@@ -53,7 +53,8 @@ exports.addSeries = async (req, res) => {
         })
     } catch (err) {
         res.status(400).send({ 
-            message: "Cannot add Series", error: err.message 
+            message: "Cannot add Series",
+            error: err.message 
         })
     }
 }
@@ -68,7 +69,7 @@ function uploadImage(files) {
             var imgURL = []
             const promise = files.map(async (imageData) => {
                 const uploadedImage = await s3.upload({
-                    Bucket: process.env.AWS_BUCKET_NAME,
+                    Bucket: process.env.AWS_S3_BUCKET_NAME,
                     Key: "Product/" + Date.now() + "-" + imageData.originalname,
                     Body: imageData.buffer,
                 }).promise()
