@@ -69,7 +69,7 @@ function uploadImage(files) {
             const promise = files.map(async (imageData) => {
                 const uploadedImage = await s3.upload({
                     Bucket: process.env.AWS_BUCKET_NAME,
-                    Key: "test/Product/" + Date.now() + "-" + imageData.originalname,
+                    Key: "Product/" + Date.now() + "-" + imageData.originalname,
                     Body: imageData.buffer,
                 }).promise()
                 imgURL.push(uploadedImage.Location)
@@ -80,53 +80,4 @@ function uploadImage(files) {
             reject(err)
         }
     })
-}
-  
-const getListImage = async (req, res) => {
-    const s3 = new AWS.S3({
-      accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-    });
-    var params = {
-      Bucket: process.env.AWS_BUCKET_NAME,
-      Delimiter: "/",
-      Prefix: "test/Product/",
-    };
-    const list = [];
-    s3.listObjects(params, function (err, data) {
-      data.Contents.forEach((obj, index) => {
-        list.push({
-          fileName: obj.Key.replace("test/Product/", ""),
-          path: BASE_URL + obj.Key,
-        });
-      });
-      list.shift();
-      res.send(list);
-    });
-};
-
-const download = async (req, res) => {
-    const s3 = new AWS.S3({
-      accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-    });
-    var params = {
-      Bucket: process.env.AWS_BUCKET_NAME,
-      Key: "test/Product/" + req.params.fileName,
-    };
-  //   res.attachment("Product/" + req.params.fileName);
-  //   var fileStream = s3.getObject(params).createReadStream();
-  //   fileStream.pipe(res);
-  //   fileStream.on("error", () =>
-  //     res.status(400).send({ message: "file not found!" })
-  //   );
-  //   fileStream.on("end", () => res.end());
-  
-    res.attachment("test/Product/" + req.params.fileName);
-    s3.getObject(params)
-        .createReadStream()
-        .on('error', (err) => { res.status(400).send('file not found! 1') })
-        .pipe(res)
-        .on('data', (data) => { res.write(data) })
-        .on('end', () => {res.end()} )
 }
