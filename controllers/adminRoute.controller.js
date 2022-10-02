@@ -32,6 +32,7 @@ exports.addSeries = async (req, res) => {
     try {
         var db = mongoUtil.getDb()
         const imgURL = await uploadImage(req.files)
+        console.log(req.files)
         const { title, author, illustrator, publisher, genres } = req.body
         const description = req.body.description === 'undefined'? undefined : req.body.description
         const keyword = req.body.keyword === 'undefined'? undefined : req.body.keyword
@@ -68,6 +69,7 @@ function uploadImage(files) {
             })
             var imgURL = []
             const promise = files.map(async (imageData) => {
+                console.log(imageData.buffer)
                 const uploadedImage = await s3.upload({
                     Bucket: process.env.AWS_S3_BUCKET_NAME,
                     Key: "Product/" + Date.now() + "-" + imageData.originalname,
