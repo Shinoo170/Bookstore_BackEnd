@@ -5,12 +5,6 @@ const auth = require('./routes/auth.router')
 
 app.use(express.json())
 
-const corsOptions = {
-    origin: '*',
-    Credential: true
-}
-app.use(cors(corsOptions))
-
 // [ connect to database ]
 mongoUtil.connectToServer(function(err, client){
     if (err) console.log(err);
