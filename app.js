@@ -2,7 +2,6 @@ const express = require('express')
 const app = express()
 const mongoUtil = require('./config/database')
 const auth = require('./routes/auth.router')
-const img = require('./routes/img.router')
 
 app.use(express.json())
 app.use((req, res, next) => {
@@ -11,6 +10,12 @@ app.use((req, res, next) => {
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE')
     next()
 })
+
+const corsOptions = {
+    origin: '*',
+    Credential: true
+}
+app.use(cors(corsOptions))
 
 // [ connect to database ]
 mongoUtil.connectToServer(function(err, client){
@@ -21,15 +26,6 @@ app.get('/', (req, res) => {
     res.status(200).json({
         status: 200,
         message: "Server is running"
-    })
-})
-
-app.get('/testAPI', (req,res) => {
-    res.status(200).json({
-        status: 200,
-        website: "Bookstore backend",
-        admin: "Shinoo",
-        admin2: "Seres"
     })
 })
 
