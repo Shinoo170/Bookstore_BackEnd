@@ -1,28 +1,50 @@
 const mongoUtil = require('../config/database')
-const AWS = require("aws-sdk");
-
-const BASE_URL = process.env.AWS_S3_URL
   
 exports.addProduct = async (req, res) => {
     try {
         var db = mongoUtil.getDb()
-        const imgURL = await uploadImage(req.files)
-        const { seriesId, title, bookNum, description, price, amount, status, category } = req.body
-        const URL = title.replaceAll(" ","-") + '-เล่ม-' + bookNum + '-' + category
-        await db.collection('products').insertOne({
-            url : URL,
-            seriesId,
-            bookNum,
-            description,
-            price,
-            amount,
-            status,
-            score: undefined,
-            img : imgURL,
-        });
-        res.status(201).send({
-            message: "Add product success"
-        });
+        const { seriesId, title, bookNum, category, description, status, price, amount, img } = req.body
+
+        mongoUtil.getNextSequence('productId', async function(err, result){
+            var url = title.trim().replaceAll(" ","-")
+            if(category === 'novel' || category === 'manga'){
+                url += '-เล่ม-' + bookNum + (category==='novel'? '-นิยาย':'-มังงะ')
+            }else{
+                url += '-สินค้า-' + bookNum
+            }
+            const newDate = {
+                seriesId,
+                productId: result,
+                title: title.trim(),
+                url,
+                bookNum,
+                category,
+                description,
+                status,
+                price,
+                amount,
+                img,
+                addDate: Date.now(),
+                lastModify: Date.now(),
+            }
+            db.collection('products').insertOne(newDate, function(err, result){
+                if(err) res.status(400).send({ message: "cannot add product", error: err.message })
+                const target = "products.total" + category.charAt(0).toUpperCase() + category.slice(1)
+                const addIdTarget = "products." + category + "Id"
+                db.collection('series').updateOne({seriesId: parseInt(seriesId)},{
+                    $inc: {
+                        "products.totalProducts": 1,
+                        [target]: 1,
+                    },
+                    $push: {
+                        [addIdTarget]: result.insertedId,
+                    }
+                })
+                res.status(201).send({
+                    message: "Add product success",
+                })
+            })
+        })
     } catch (err) {
         res.status(400).send({ message: "error", error: err.message })
     }
@@ -31,26 +53,37 @@ exports.addProduct = async (req, res) => {
 exports.addSeries = async (req, res) => {
     try {
         var db = mongoUtil.getDb()
-        const imgURL = await uploadImage(req.files)
-        console.log(req.files)
-        const { title, author, illustrator, publisher, genres } = req.body
+        const { title, author, illustrator, publisher, genres, keywords, img } = req.body
         const description = req.body.description === 'undefined'? undefined : req.body.description
-        const keyword = req.body.keyword === 'undefined'? undefined : req.body.keyword
-        mongoUtil.getNextSequence(db, 'seriesid', async function(err, result){
+        mongoUtil.getNextSequence( 'seriesId', async function(err, result){
             await db.collection('series').insertOne({
                 seriesId: result,
-                title,
-                author,
-                illustrator,
-                publisher,
+                title: title.trim(),
+                author: author.trim(),
+                illustrator: illustrator.trim(),
+                publisher: publisher.trim(),
                 description,
                 genres,
-                keyword,
-                img : imgURL[0],
+                keywords,
+                img,
+                addDate: Date.now(),
+                lastModify: Date.now(),
+                status: 'available',
+                products: {
+                    totalProducts: 0,
+                    totalManga: 0,
+                    totalNovel: 0,
+                    totalOther: 0,
+                    mangaId: [],
+                    novelId: [],
+                    productId: []
+                }
+            }, function(err, result){
+                calculateCos()
             })
         })
         res.status(201).send({
-            message: "Add series success"
+            message: "Add series success",
         })
     } catch (err) {
         res.status(400).send({ 
@@ -60,27 +93,109 @@ exports.addSeries = async (req, res) => {
     }
 }
 
-function uploadImage(files) {
-    return new Promise(async (resolve, reject) => {
-        try{
-            const s3 = new AWS.S3({
-                accessKeyId: process.env.AWS_S3_ACCESS_KEY_ID,
-                secretAccessKey: process.env.AWS_S3_SECRET_ACCESS_KEY,
+exports.reCalculateCos = (req, res) => {
+    var db = mongoUtil.getDb()
+    db.collection('series').find({}, {
+        projection: {
+            _id: 0,
+            seriesId: 1,
+            title: 1,
+            keywords: 1,
+        }
+    }).toArray( async (err, result) => {
+        const arr = [...result]
+        const length = arr.length
+        // get cosineSimilarity
+        const new_cosine_sim = Array(length).fill().map(() => Array(length));
+        var cosine_sim
+        for(let i=0; i<arr.length; i++){
+            for(let j=i+1; j<arr.length; j++){
+                cosine_sim = cosineSimilarity(arr[i], arr[j])
+                new_cosine_sim[i][j] = cosine_sim
+                new_cosine_sim[j][i] = cosine_sim
+            }
+            new_cosine_sim[i][i] = 1
+        }
+        res.send(new_cosine_sim)
+        db.collection('cosineTable').updateOne({name: 'origin'},{
+            $set: {data: new_cosine_sim}
+        })
+    })
+}
+
+async function calculateCos(){
+    var db = mongoUtil.getDb()
+    db.collection('series').find({}, {
+        projection: {
+            _id: 0,
+            seriesId: 1,
+            title: 1,
+            keywords: 1,
+        }
+    }).toArray( async (err, result) => {
+        const arr = [...result]
+        const newSeriesId = arr.length - 1
+        if(newSeriesId == -1) { return }
+        if(newSeriesId == 0){
+            await db.collection('cosineTable').insertOne({
+                name: 'origin',
+                data: [[1]]
             })
-            var imgURL = []
-            const promise = files.map(async (imageData) => {
-                console.log(imageData.buffer)
-                const uploadedImage = await s3.upload({
-                    Bucket: process.env.AWS_S3_BUCKET_NAME,
-                    Key: "Product/" + Date.now() + "-" + imageData.originalname,
-                    Body: imageData.buffer,
-                }).promise()
-                imgURL.push(uploadedImage.Location)
-            })
-            await Promise.all(promise)
-            resolve(imgURL)
-        }catch(err){
-            reject(err)
+            return
+        }
+        // get cosineSimilarity
+        const data = await db.collection('cosineTable').findOne({name: 'origin'}, {projection: {_id:0, data:1} })
+        const new_cosine_sim = data.data
+
+        new_cosine_sim.push([])
+        for(let i=0; i<arr.length-1; i++){
+            const cosine_sim = cosineSimilarity(arr[i], arr[newSeriesId])
+            new_cosine_sim[i].push(cosine_sim)
+            new_cosine_sim[newSeriesId].push(cosine_sim)
+        }
+        new_cosine_sim[newSeriesId].push(1)
+        db.collection('cosineTable').updateOne({name: 'origin'},{
+            $set: {data: new_cosine_sim}
+        })
+    })
+}
+
+function cosineSimilarity(p1, p2){
+    const [ product1, product2 ] = [ p1.keywords, p2.keywords ]
+    const set = new Set()
+    product1.forEach( data => {
+        set.add(data)
+    })
+    product2.forEach( data => {
+        set.add(data)
+    })
+    const data = Array.from(set)
+
+    const [ p1Keyword, p2Keyword] = [ [],[] ]
+    data.forEach( (element, index) => {
+        if(product1.indexOf(element) > -1){
+            p1Keyword[index] = 1
+        } else {
+            p1Keyword[index] = 0
+        }
+        if(product2.indexOf(element) > -1){
+            p2Keyword[index] = 1
+        } else {
+            p2Keyword[index] = 0
         }
     })
+
+    // formula of cosine similarity
+    // cos(θ) = A•B / ( ||A|| ||B|| )
+    // cos(θ) = ΣAiBi / ( sqrt(ΣAi^2) × sqrt(ΣBi^2) )
+    // Σ start from i=0 to n
+    // A = vector of product1 , B = vector of product2
+    var [ AdotB, lengthA, lengthB ]= [0,0,0]
+    for(let i=0; i<p1Keyword.length; i++){
+        AdotB += p1Keyword[i] * p2Keyword[i]
+        lengthA += p1Keyword[i]
+        lengthB += p2Keyword[i]
+    }
+    const result = AdotB / (Math.sqrt(lengthA) * Math.sqrt(lengthB))
+    return result
 }

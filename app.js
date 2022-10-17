@@ -8,7 +8,7 @@ require('dotenv').config()
 const mongoUtil = require('./config/database')
 const auth = require('./routes/auth.router')
 const admin = require('./routes/admin.route')
-const product = require('./routes/listProduct.route')
+const product = require('./routes/product.route')
 
 const corsOptions = {
     origin: '*',
@@ -33,7 +33,7 @@ app.get('/', (req, res) => {
 // [ authorization system ]
 app.use('/auth', auth)
 
-// [ get product system ]
+// [ get products system ]
 app.use('/product', product)
 
 // [ admin system ]

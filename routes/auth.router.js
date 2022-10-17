@@ -1,12 +1,12 @@
 const express = require('express')
 const router = express.Router()
-const verifySignUp = require('../middleware/verifySignup')
+const verify = require('../middleware/userVerify')
 const controller = require('../controllers/auth.controller')
 const authJwt = require('../middleware/authJwt')
 
 router.post('/signin', controller.signin)
 
-router.post('/signup', verifySignUp.checkEmail, controller.signup )
+router.post('/signup', verify.checkEmail, controller.signup )
 
 router.post('/signout', async (req, res) => {
     res.status(200).send({ message: "Log out successfully "})

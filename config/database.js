@@ -16,14 +16,24 @@ module.exports = {
     return _db
   },
 
-  getNextSequence: function(db, field, callback) {
-    db.collection('counters').findOneAndUpdate( 
-      { _id: field }, 
+  getNextSequence( field, callback) {
+    _db.collection('counters').findOneAndUpdate(
+      { _id: field },
       { $inc: { seq: 1 } },
-      function(err, result){
-          if(err) callback(err, result)
-          callback(err, result.value.seq)
+      function (err, result) {
+        if (err) {
+          callback(err, result)
+        }
+        callback(err, result.value.seq)
       }
     )
-  }
+  },
+
+  // when error
+  previousSequence( field ) {
+    _db.collection('counters').findOneAndUpdate(
+      { _id: field },
+      { $inc: { seq: -1 } }
+    )
+  },
 }

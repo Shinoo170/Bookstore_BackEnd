@@ -66,10 +66,50 @@ exports.signin = async (req, res) => {
             }) 
         }
     }catch(err){
-        res.status(400).send(err.message)
+        res.status(400).send({
+            message: 'error',
+            error: err.message
+        })
     }
 }
 
 function generateCode(){
     return Math.floor(Math.random() * (999999 - 100000) + 100000).toString()
+}
+
+exports.SendVerifyCode = async (req, res) => {
+    let { email } = req.body
+    var db = mongoUtil.getDb()
+    let findEmail = await db.collection('users').findOne({
+        email: req.body.email
+    })
+    if( findEmail ){
+        db.collection('unVerifiedEmail').findOneAndUpdate(
+            { email },
+            { code: generateCode(), date: Date.now() },
+            function( err, result ){
+                if (err){
+                    res.status(400).send({
+                        message: 'Cannot send verify code',
+                        error: err.message
+                    })
+                }
+                res.status(200).send({ message: 'send success'})
+            })
+    } else {
+       db.collection('unVerifiedEmail').insertOne({
+            email,
+            code: generateCode(),
+            date: Date.now()
+        }, function( err, result){
+            if (err){
+                res.status(400).send({
+                    message: 'Cannot send verify code',
+                    error: err.message
+                })
+            }
+            res.status(200).send({ message: 'send success'})
+        }) 
+    }
+    
 }
