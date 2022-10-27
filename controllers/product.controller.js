@@ -11,7 +11,7 @@ exports.getAllSeries = async (req, res) => {
                 title: 1,
                 img: 1,
                 addDate: 1,
-                lastUpdate: 1,
+                lastModify: 1,
             }).toArray( (err, result) => {
                 if(err) res.status(400).send({ message: 'Cannot connect to database'})
                 res.send(result)
@@ -72,15 +72,58 @@ exports.getProduct = async (req, res) => {
     }
 }
 
+exports.getLatestSeries = async (req, res) => {
+    try{
+        const db = mongoUtil.getDb()
+        const data = await db.collection('series').find({}).project({
+            _id: 0,
+            seriesId: 1,
+            title: 1,
+            author: 1,
+            illustrator: 1,
+            publisher: 1,
+            genres: 1,
+            img: 1,
+            score: 1,
+            addDate: 1,
+            lastModify: 1,
+            status: 1,
+            products: {
+                totalManga: 1,
+                totalNovel: 1,
+                totalOther: 1,
+            }   
+        }).sort({lastModify: -1}).toArray()
+        if(data){
+            res.status(200).send(data)
+        }else{
+            res.status(400).send({message: 'No product found!', err})
+        }
+    }catch(err){
+        res.status(400).send({message: 'Error to get data', err})
+    }
+}
+
+exports.getLatestProduct = async (req, res) => {
+    try{
+        const db = mongoUtil.getDb()
+        const data = await db.collection('products').find({}).sort({productId: -1}).toArray()
+        if(data){
+            res.status(200).send(data)
+        }else{
+            res.status(400).send({message: 'No product found!', err})
+        }
+    }catch(err){
+        res.status(400).send({message: 'Error to get data', err})
+    }
+}
+
 exports.getAllGenres = async (req, res) => {
     try{
         const db = mongoUtil.getDb()
-        const array = []
-        db.collection('keywords').find({}, { projection: { _id: 0, keyword: 1} }).toArray( (err, result) => {
-            res.send( result )
-        })
-        
+        const data = await db.collection('globalData').findOne({ field: 'genres'}, { projection: { _id: 0, data: 1}})
+        res.send( data.data.sort() )
     } catch(err) {
-
+        res.status(400).send({ message: 'error', err})
     }
 } 

@@ -17,7 +17,8 @@ exports.signup = async (req, res) => {
                 lastName: undefined,
                 displayName: email,
                 registerData: Date.now(),
-                unVerifiedEmail: true
+                unVerifiedEmail: true,
+                img,
             }
         }, (err, result) => {
             db.collection('unVerifiedEmail').insertOne({
@@ -57,7 +58,9 @@ exports.signin = async (req, res) => {
             )
             res.status(200).send({
                 message: "login success",
-                token
+                token,
+                userId: userData._id,
+                name: userData.userData.displayName,
             })
         } else {
             // no username found or password not match

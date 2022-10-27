@@ -11,4 +11,6 @@ router.post('/addSeries', controller.addSeries )
 
 router.post('/reCalculateCos', controller.reCalculateCos)
 
+router.post('/addGenres', controller.addGenres)
+
 module.exports = router

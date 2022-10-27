@@ -16,31 +16,36 @@ all environment variables you need
 - `TOKEN_KEY` for Jsonwebtoken
 - `MONGODB_URL` mongodb or mongodb atlas url
 - `DB_NAME` database name
-- `BASE_URL_IMG` base url + /img/ example: http://example.com/img/
 
-## API call 
+## RESTful API
 
 ### `method : GET`
 
 - `/` return server status
-- `/img` return all image data
-- `/img/<file_name>` return image
+- `/product/allSeries` return all series
+- `/series/<seriesId>` return specific series details ( contain all product in series )
+- `/series/<productURL>` return specific product details
+- `/latestProduct` return latest product
 
 ### `method : POST`
 
 - `/auth/signin`
 	- params : user , password
-	- return : `status 201` if success or `status 400` if error
 - `/auth/signup`
 	- params : user , password
-	- return : `status 201` if success or `status 400` if error
 - `/auth/test`
 	- test json web token
 	- header 'jwt' required
-	- return `status 200 && token` if success or `status 400` if error
-- `/img/upload`
-	- params : image file
-	- return `status 201` if upload success or `status 404` if file not found
+	- return `token` 
+- `/admin/addSeries`
+	- add series
+	- header 'jwt' with role admin required
+- `/admin/addProduct`
+	- add product 
+	- header 'jwt' with role admin required
+- `/admin/reCalculateCos`
+	- re calculate CosineSimilarity table
+	- header 'jwt' with role admin required
 
 ### `method : PUT`
 

@@ -39,4 +39,33 @@ app.use('/product', product)
 // [ admin system ]
 app.use('/admin', admin)
 
+const nodemailer = require('nodemailer');
+app.get('/email' , (req, res) => {
+    try {
+        const transporter = nodemailer.createTransport({
+            service: 'hotmail',
+            auth: {
+              user: 'ptbookshop@outlook.co.th', // your email
+              pass: 'Pp13413416' // your email password
+            }
+        });
+        let mailOptions = {
+            from: 'ptbookshop@outlook.co.th',                // sender
+            to: 'patrapong17@gmail.com',                // list of receivers
+            subject: 'Hello from sender',              // Mail subject
+            html: '<b>Do you receive this mail?</b>'   // HTML body
+        };
+        transporter.sendMail(mailOptions, function (err, info) {
+            if(err)
+                res.send(err)
+            else
+              res.send("success")
+         });
+          
+    } catch (err){
+        res.send(err)
+    }
+    
+})
+
 module.exports = app;

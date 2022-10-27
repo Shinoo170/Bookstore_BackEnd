@@ -24,6 +24,7 @@ exports.addProduct = async (req, res) => {
                 price,
                 amount,
                 img,
+                score,
                 addDate: Date.now(),
                 lastModify: Date.now(),
             }
@@ -66,6 +67,7 @@ exports.addSeries = async (req, res) => {
                 genres,
                 keywords,
                 img,
+                score,
                 addDate: Date.now(),
                 lastModify: Date.now(),
                 status: 'available',
@@ -198,4 +200,15 @@ function cosineSimilarity(p1, p2){
     }
     const result = AdotB / (Math.sqrt(lengthA) * Math.sqrt(lengthB))
     return result
+}
+
+exports.addGenres = async (req, res) => {
+    var db = mongoUtil.getDb()
+    const newGenres = req.body.newGenres
+    await db.collection('globalData').updateOne({ field: 'genres'},{
+        $push: {
+            data: newGenres
+        }
+    })
+    res.send('add success')
 }
