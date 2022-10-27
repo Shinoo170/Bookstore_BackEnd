@@ -67,7 +67,7 @@ exports.addSeries = async (req, res) => {
                 genres,
                 keywords,
                 img,
-                score,
+                score: 0,
                 addDate: Date.now(),
                 lastModify: Date.now(),
                 status: 'available',
