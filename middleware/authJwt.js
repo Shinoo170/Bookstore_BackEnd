@@ -1,14 +1,16 @@
 const jwt = require('jsonwebtoken')
 
 exports.verifyToken = async (req, res, next) => {
-    const token = req.headers['jwt']
+    const token = req.headers['jwt'] || req.body.jwt
     if(!token){
         return res.status(403).send({ message: "No token!" })
     }
     try{
         jwt.verify(token, process.env.TOKEN_KEY, (err, decoded) => {
             if (err) {
-                return res.status(401).send({ message: "Unauthorized!" })
+                // Expire or Invalid
+                console.log(err.message)
+                return res.status(401).send({ message: "Unauthorized!", error: err.message })
             }
             req.user_id = decoded.user_id
             req.role = decoded.role

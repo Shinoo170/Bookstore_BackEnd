@@ -1,34 +1,40 @@
+// [ connect to database ]
 const mongoUtil = require('../config/database')
+mongoUtil.connectToServer(function(err, client){
+    if (err) console.log(err);
+})
+
   
 exports.addProduct = async (req, res) => {
     try {
         var db = mongoUtil.getDb()
-        const { seriesId, title, bookNum, category, description, status, price, amount, img } = req.body
+        const { seriesId, title, bookNum, category, thai_category, description, status, price, amount, img } = req.body
 
         mongoUtil.getNextSequence('productId', async function(err, result){
             var url = title.trim().replaceAll(" ","-")
             if(category === 'novel' || category === 'manga'){
-                url += '-เล่ม-' + bookNum + (category==='novel'? '-นิยาย':'-มังงะ')
+                url += '-เล่ม-' + bookNum + '-' + thai_category
             }else{
-                url += '-สินค้า-' + bookNum
+                url +=  '-' + bookNum + '-สินค้า'
             }
-            const newDate = {
+            const newData = {
                 seriesId,
                 productId: result,
                 title: title.trim(),
                 url,
-                bookNum,
+                bookNum: parseInt(bookNum),
                 category,
+                thai_category,
                 description,
                 status,
-                price,
-                amount,
+                price: parseInt(price),
+                amount: parseInt(amount),
                 img,
-                score,
+                score: { avg:0 , count:0 },
                 addDate: Date.now(),
                 lastModify: Date.now(),
             }
-            db.collection('products').insertOne(newDate, function(err, result){
+            db.collection('products').insertOne(newData, function(err, result){
                 if(err) res.status(400).send({ message: "cannot add product", error: err.message })
                 const target = "products.total" + category.charAt(0).toUpperCase() + category.slice(1)
                 const addIdTarget = "products." + category + "Id"
@@ -56,6 +62,7 @@ exports.addSeries = async (req, res) => {
         var db = mongoUtil.getDb()
         const { title, author, illustrator, publisher, genres, keywords, img } = req.body
         const description = req.body.description === 'undefined'? undefined : req.body.description
+        const date = Date.now();
         mongoUtil.getNextSequence( 'seriesId', async function(err, result){
             await db.collection('series').insertOne({
                 seriesId: result,
@@ -67,18 +74,20 @@ exports.addSeries = async (req, res) => {
                 genres,
                 keywords,
                 img,
-                score: 0,
-                addDate: Date.now(),
-                lastModify: Date.now(),
+                score: { avg:0 , count:0 },
+                addDate: date,
+                lastModify: date,
                 status: 'available',
                 products: {
                     totalProducts: 0,
                     totalManga: 0,
                     totalNovel: 0,
                     totalOther: 0,
+                    priceRange: { all:[], manga:[], novel:[], product:[] },
+                    lastModify: { manga: date, novel: date, other: date },
                     mangaId: [],
                     novelId: [],
-                    productId: []
+                    otherId: []
                 }
             }, function(err, result){
                 calculateCos()

@@ -1,4 +1,9 @@
+// [ connect to database ]
 const mongoUtil = require('../config/database')
+mongoUtil.connectToServer(function(err, client){
+    if (err) console.log(err);
+})
+
 
 const bcrypt = require('bcryptjs')
 const jwt = require('jsonwebtoken')
@@ -19,6 +24,11 @@ exports.signup = async (req, res) => {
                 registerData: Date.now(),
                 unVerifiedEmail: true,
                 img,
+            },
+            cart: {
+                list: [],
+                startTime: date.now(),
+                endTime: date.now() + 7*24*60*60*1000   // 7 days
             }
         }, (err, result) => {
             db.collection('unVerifiedEmail').insertOne({
