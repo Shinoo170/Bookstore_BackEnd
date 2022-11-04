@@ -35,7 +35,6 @@ exports.getAllSeries = async (req, res) => {
                 res.send(result)
             })
         })
-
     }catch(err){
         res.status(400).send({message: 'Error to get data', err})
     }
@@ -152,6 +151,7 @@ exports.getLatestSeries = async (req, res) => {
         mongoUtil.connectToServer(async function(err, client){
             if (err) console.log(err)
             const db = mongoUtil.getDb()
+            console.log(db.serverConfig.isConnected())
             const data = await db.collection('series').find({}).project({
                 _id: 0,
                 seriesId: 1,
@@ -178,6 +178,7 @@ exports.getLatestSeries = async (req, res) => {
             } 
         })
     }catch(err){
+        console.log(err)
         res.status(400).send({message: 'Error to get data', err})
     }
 }
