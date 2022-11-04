@@ -2,11 +2,13 @@ const MongoClient = require('mongodb').MongoClient
 const url = process.env.MONGODB_URI
 
 var _db
+var _root_db
 
 module.exports = {
   connectToServer: function( callback ) {
     MongoClient.connect( url,  { useNewUrlParser: true }, function( err, client ) {
       _db  = client.db('bookstore')
+      _root_db = client
       // console.log("connected to database")
       return callback( err )
     })
@@ -15,6 +17,10 @@ module.exports = {
   getDb: function() {
     return _db
   },
+  getRootDb: function() {
+    return _root_db
+  },
+
 
   getNextSequence( field, callback) {
     _db.collection('counters').findOneAndUpdate(

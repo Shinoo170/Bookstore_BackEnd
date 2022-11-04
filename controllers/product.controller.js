@@ -151,7 +151,8 @@ exports.getLatestSeries = async (req, res) => {
         mongoUtil.connectToServer(async function(err, client){
             if (err) console.log(err)
             const db = mongoUtil.getDb()
-            console.log(db.serverConfig.isConnected())
+            const rootDb = mongoUtil.getRootDb()
+            console.log(rootDb.topology.isConnected())
             const data = await db.collection('series').find({}).project({
                 _id: 0,
                 seriesId: 1,
