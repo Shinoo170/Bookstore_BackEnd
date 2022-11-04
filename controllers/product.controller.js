@@ -2,13 +2,15 @@
 const mongoUtil = require('../config/database')
 const ObjectId = require('mongodb').ObjectId
 mongoUtil.connectToServer(function(err, client){
-    if (err) console.log(err);
+    if (err) console.log(err)
 })
 
 exports.getAllSeries = async (req, res) => {
     try{
-        const db = mongoUtil.getDb()
-        await db.collection('series')
+        mongoUtil.connectToServer(async function(err, client){
+            if (err) console.log(err)
+            const db = mongoUtil.getDb()
+            await db.collection('series')
             .find({})
             .project({
                 _id: 0,
@@ -32,6 +34,8 @@ exports.getAllSeries = async (req, res) => {
                 if(err) res.status(400).send({ message: 'Cannot connect to database'})
                 res.send(result)
             })
+        })
+
     }catch(err){
         res.status(400).send({message: 'Error to get data', err})
     }
@@ -145,31 +149,34 @@ exports.getProduct = async (req, res) => {
 
 exports.getLatestSeries = async (req, res) => {
     try{
-        const db = mongoUtil.getDb()
-        const data = await db.collection('series').find({}).project({
-            _id: 0,
-            seriesId: 1,
-            title: 1,
-            author: 1,
-            illustrator: 1,
-            publisher: 1,
-            genres: 1,
-            img: 1,
-            score: 1,
-            addDate: 1,
-            lastModify: 1,
-            status: 1,
-            products: {
-                totalManga: 1,
-                totalNovel: 1,
-                totalOther: 1,
-            }
-        }).sort({lastModify: -1}).toArray()
-        if(data){
-            res.status(200).send(data)
-        }else{
-            res.status(400).send({message: 'No product found!', err})
-        }
+        mongoUtil.connectToServer(async function(err, client){
+            if (err) console.log(err)
+            const db = mongoUtil.getDb()
+            const data = await db.collection('series').find({}).project({
+                _id: 0,
+                seriesId: 1,
+                title: 1,
+                author: 1,
+                illustrator: 1,
+                publisher: 1,
+                genres: 1,
+                img: 1,
+                score: 1,
+                addDate: 1,
+                lastModify: 1,
+                status: 1,
+                products: {
+                    totalManga: 1,
+                    totalNovel: 1,
+                    totalOther: 1,
+                }
+            }).sort({lastModify: -1}).toArray()
+            if(data){
+                res.status(200).send(data)
+            }else{
+                res.status(400).send({message: 'No product found!', err})
+            } 
+        })
     }catch(err){
         res.status(400).send({message: 'Error to get data', err})
     }

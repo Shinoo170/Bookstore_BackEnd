@@ -73,7 +73,7 @@ exports.addToCart = async (req, res) => {
             $set: { cart }
         }, (err, result) => {
             if(err) res.status(400).send({message: 'Cannot add to cart', err})
-            res.status(201).send({message: 'add', currentCart: cart})
+            res.status(200).send({message: 'add success', currentCart: cart})
         })
         
     } catch (err) {
