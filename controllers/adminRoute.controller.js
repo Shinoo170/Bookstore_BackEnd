@@ -33,6 +33,8 @@ exports.addProduct = async (req, res) => {
                 score: { avg:0 , count:0 },
                 addDate: Date.now(),
                 lastModify: Date.now(),
+                sold: 0,
+                population: 0,
             }
             db.collection('products').insertOne(newData, function(err, result){
                 if(err) res.status(400).send({ message: "cannot add product", error: err.message })

@@ -17,7 +17,9 @@ module.exports = {
   getDb: function() {
     return _db
   },
+
   getRootDb: function() {
+    // _root_db.topology.isConnected()
     return _root_db
   },
 

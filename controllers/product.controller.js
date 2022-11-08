@@ -151,8 +151,6 @@ exports.getLatestSeries = async (req, res) => {
         mongoUtil.connectToServer(async function(err, client){
             if (err) console.log(err)
             const db = mongoUtil.getDb()
-            const rootDb = mongoUtil.getRootDb()
-            console.log(rootDb.topology.isConnected())
             const data = await db.collection('series').find({}).project({
                 _id: 0,
                 seriesId: 1,
@@ -206,4 +204,19 @@ exports.getAllGenres = async (req, res) => {
     } catch(err) {
         res.status(400).send({ message: 'error', err})
     }
-} 
+}
+
+exports.review = async (req, res) => {
+    try {
+        var db = mongoUtil.getDb()
+        const { productId, review } = req.body
+        const _id = new ObjectId(req.user_id)
+        db.collection('review').insertOne({})
+    } catch (error) {
+        
+    }
+}
+
+exports.getReview = async (req, res) => {
+
+}

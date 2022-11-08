@@ -4,15 +4,28 @@ mongoUtil.connectToServer(function(err, client){
     if (err) console.log(err);
 })
 
-
 const bcrypt = require('bcryptjs')
 const jwt = require('jsonwebtoken')
+var omise = require('omise')({
+    'publicKey': process.env.OMISE_PUBLIC_KEY,
+    'secretKey': process.env.OMISE_SECRET_KEY
+})
+
+const createOmiseCustomer = async (email) => {
+    const customer = await omise.customers.create({
+        email,
+        'description': `email : ${email}`,
+    })
+    return customer
+}
 
 exports.signup = async (req, res) => {
     var db = mongoUtil.getDb()
     try{
         const { email, password } = req.body
-        encryptPassword = await bcrypt.hash(password, 10);
+        // const omiseCustomer = await createOmiseCustomer(email)
+        const encryptPassword = await bcrypt.hash(password, 10)
+        const displayName = email.split('@')
         await db.collection('users').insertOne({
             email,
             password: encryptPassword,
@@ -20,16 +33,17 @@ exports.signup = async (req, res) => {
             userData: {
                 firstName: undefined,
                 lastName: undefined,
-                displayName: email,
+                displayName: displayName[0],
                 registerData: Date.now(),
                 unVerifiedEmail: true,
-                img,
+                img: undefined,
             },
             cart: {
                 list: [],
-                startTime: date.now(),
-                endTime: date.now() + 7*24*60*60*1000   // 7 days
-            }
+                created: Date.now(),
+                expired: Date.now() + 7*24*60*60*1000   // 7 days
+            },
+            order: [],
         }, (err, result) => {
             db.collection('unVerifiedEmail').insertOne({
                 email,
@@ -45,7 +59,7 @@ exports.signup = async (req, res) => {
     }
 }
 
-exports.signin = async (req, res) => {
+exports.signIn = async (req, res) => {
     var db = mongoUtil.getDb()
     try{
         let { user, password } = req.body
@@ -59,6 +73,7 @@ exports.signin = async (req, res) => {
             const token = jwt.sign(
                 {
                     user_id: userData._id,
+                    email: userData.email,
                     role: userData.role
                 },
                 process.env.TOKEN_KEY,
@@ -75,8 +90,9 @@ exports.signin = async (req, res) => {
         } else {
             // no username found or password not match
             res.status(400).send({
-                message: "Failed to login"
-            }) 
+                message: "Failed to login",
+                error: "Username or password not match"
+            })
         }
     }catch(err){
         res.status(400).send({

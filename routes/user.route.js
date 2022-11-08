@@ -11,6 +11,9 @@ router.get('/cart', authJwt.verifyToken, controller.getCart)
 router.put('/cart', authJwt.verifyToken, controller.addToCart)
 
 // Delete product in cart
-router.delete('/cart', authJwt.verifyToken, controller.deleteItem)
+router.patch('/cart', authJwt.verifyToken, controller.deleteItem)
+
+// Place order, create omise customer and charges
+router.post('/placeOrder', authJwt.verifyToken, controller.placeOrder)
 
 module.exports = router

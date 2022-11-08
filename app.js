@@ -10,6 +10,7 @@ const auth = require('./routes/auth.router')
 const admin = require('./routes/admin.route')
 const user = require('./routes/user.route')
 const product = require('./routes/product.route')
+const util = require('./routes/utility.route')
 
 const corsOptions = {
     origin: '*',
@@ -43,6 +44,9 @@ app.use('/admin', admin)
 // [ user system ]
 app.use('/user', user)
 
+// [ Utility system ]
+app.use('/util', util)
+
 const nodemailer = require('nodemailer');
 app.get('/email' , (req, res) => {
     try {
@@ -71,5 +75,6 @@ app.get('/email' , (req, res) => {
     }
     
 })
+
 
 module.exports = app;

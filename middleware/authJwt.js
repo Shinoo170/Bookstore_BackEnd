@@ -13,6 +13,7 @@ exports.verifyToken = async (req, res, next) => {
                 return res.status(401).send({ message: "Unauthorized!", error: err.message })
             }
             req.user_id = decoded.user_id
+            req.email = decoded.email
             req.role = decoded.role
             next()
         })

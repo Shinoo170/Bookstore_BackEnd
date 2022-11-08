@@ -4,7 +4,7 @@ const verify = require('../middleware/userVerify')
 const controller = require('../controllers/auth.controller')
 const authJwt = require('../middleware/authJwt')
 
-router.post('/signin', controller.signin)
+router.post('/signIn', controller.signIn)
 
 router.post('/signup', verify.checkEmail, controller.signup )
 
