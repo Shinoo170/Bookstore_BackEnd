@@ -24,4 +24,10 @@ router.get('/latestProduct', controller.getLatestProduct)
 
 router.get('/genres', controller.getAllGenres)
 
+// User add new review
+router.post('/review', authJwt.verifyToken, controller.review)
+
+// Get review
+router.get('/review', controller.getReview)
+
 module.exports = router

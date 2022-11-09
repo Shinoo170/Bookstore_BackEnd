@@ -209,14 +209,45 @@ exports.getAllGenres = async (req, res) => {
 exports.review = async (req, res) => {
     try {
         var db = mongoUtil.getDb()
-        const { productId, review } = req.body
+        const { productId, review, score } = req.body
         const _id = new ObjectId(req.user_id)
-        db.collection('review').insertOne({})
+        db.collection('review').insertOne({
+            productId,
+            user_id: _id,
+            review,
+            score
+        })
     } catch (error) {
         
     }
 }
 
 exports.getReview = async (req, res) => {
-
+    try {
+        var db = mongoUtil.getDb()
+        const pid = req.query.productId
+        const data = await db.collection('review').aggregate([{
+                $match: {productId: parseInt(pid)}
+            },{
+                $lookup: {
+                    from: 'users',
+                    localField: 'user_id',
+                    foreignField: '_id',
+                    as: 'user'
+                }
+            },{
+                $project: {
+                    "_id": 1,
+                    "review": 1,
+                    "productId": 1,
+                    "score": 1,
+                    "user.userData.displayName": 1,
+                    "user.userData.img": 1,
+                }
+            }])
+            .toArray()
+        res.send(data)
+    } catch (error) {
+        console.log(error)
+    }
 }

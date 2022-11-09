@@ -23,7 +23,6 @@ module.exports = {
     return _root_db
   },
 
-
   getNextSequence( field, callback) {
     _db.collection('counters').findOneAndUpdate(
       { _id: field },

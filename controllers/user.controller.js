@@ -9,6 +9,65 @@ var omise = require('omise')({
     'secretKey': process.env.OMISE_SECRET_KEY
 })
 
+// Bookmark
+exports.getBookmark = async (req, res) => {
+    try {
+        mongoUtil.connectToServer(async function(err, client){
+            if (err) res.status(400).send({message: 'Cannot connect to database'})
+            var db = mongoUtil.getDb()
+            const _id = new ObjectId(req.user_id)
+            const data = await db.collection('users').findOne({ _id, bookmark: [parseInt(req.query.seriesId)] })
+            if(data){
+                res.status(200).send(true)
+            } else {
+                res.status(200).send(false)
+            }
+        })
+    } catch (error) {
+        res.status(400).send({message: 'Error to get bookmark'})
+    }
+}
+
+exports.addNewBookmark = async (req, res) => {
+    try {
+        mongoUtil.connectToServer(async function(err, client){
+            if (err) res.status(400).send({message: 'Cannot connect to database'})
+            var db = mongoUtil.getDb()
+            const _id = new ObjectId(req.user_id)
+            db.collection('users').updateOne({ _id }, {
+                $push: {
+                    bookmark: parseInt(req.query.seriesId),
+                }
+            }, (err, result) => {
+                if(err || result.matchedCount != 1) return res.status(400).send({message: 'Error to add bookmark'})
+                res.status(201).send(true)
+            })
+        })
+    } catch (error) {
+        res.status(400).send({message: 'Error to add bookmark'})
+    }
+}
+
+exports.removeBookmark = async (req, res) => {
+    try {
+        mongoUtil.connectToServer(async function(err, client){
+            if (err) res.status(400).send({message: 'Cannot connect to database'})
+            var db = mongoUtil.getDb()
+            const _id = new ObjectId(req.user_id)
+            await db.collection('users').updateOne({ _id }, {
+                $pull: {
+                    bookmark: parseInt(req.query.seriesId),
+                }
+            }, (err, result) => {
+                if(err || result.matchedCount != 1) return res.status(400).send({message: 'Error to remove bookmark'})
+                res.status(201).send(false)
+            })
+        })
+    } catch (error) {
+        res.status(400).send({message: 'Error to remove bookmark'})
+    }
+}
+
 // Cart
 exports.getCart = async (req, res) => {
     try {
@@ -178,6 +237,7 @@ exports.placeOrder = async (req, res) => {
                                 },
                                 status: 'place_order',
                             }
+                            // ! TODO : Decrease product amount , Address
                             await db.collection('order').insertOne(order)
                             await db.collection('users').updateOne({_id}, {
                                 $push: {

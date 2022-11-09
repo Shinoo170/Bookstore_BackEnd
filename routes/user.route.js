@@ -4,6 +4,15 @@ const authJwt = require('../middleware/authJwt')
 
 const controller  = require('../controllers/user.controller')
 
+// Get bookmark
+router.get('/bookmark', authJwt.verifyToken, controller.getBookmark)
+
+// Add new bookmark
+router.put('/bookmark', authJwt.verifyToken, controller.addNewBookmark)
+
+// delete bookmark
+router.delete('/bookmark', authJwt.verifyToken, controller.removeBookmark)
+
 // Get cart
 router.get('/cart', authJwt.verifyToken, controller.getCart)
 
