@@ -4,10 +4,10 @@ const ObjectId = require('mongodb').ObjectId
 mongoUtil.connectToServer(function(err, client){
     if (err) console.log(err);
 })
-var omise = require('omise')({
-    'publicKey': process.env.OMISE_PUBLIC_KEY,
-    'secretKey': process.env.OMISE_SECRET_KEY
-})
+// const omise = require('omise')({
+//     'publicKey': process.env.OMISE_PUBLIC_KEY,
+//     'secretKey': process.env.OMISE_SECRET_KEY
+// })
 const Moralis = require('moralis').default
 const { EvmChain } = require('@moralisweb3/evm-utils')
 const ethers = require('ethers')
@@ -170,29 +170,30 @@ exports.deleteItem = async (req, res) => {
 }
 
 // Omise
-const addNewCardOmise = async (id , token) => {
-    omise.customers.update(
-        id,
-        {'card': token},
-        function(error, customer) {
-            return customer.cards[customer.cards.length - 1]
-        }
-    )
-}
+// const addNewCardOmise = async (id , token) => {
+//     omise.customers.update(
+//         id,
+//         {'card': token},
+//         function(error, customer) {
+//             return customer.cards[customer.cards.length - 1]
+//         }
+//     )
+// }
 
-const chargeOmise = async (amount, token) => {
-    const charge = await omise.charges.create({
-        amount: amount*100,
-        currency: 'thb',
-        card: token
-    })
-    return charge
-}
+// const chargeOmise = async (amount, token) => {
+//     const charge = await omise.charges.create({
+//         amount: amount*100,
+//         currency: 'thb',
+//         card: token
+//     })
+//     return charge
+// }
 
 exports.placeOrder = async (req, res) => {
     mongoUtil.connectToServer(async function(err, client){
         if (err) return res.status(503).send({message : "Cannot connect to database"})
         try {
+            return res.send('place order success')
             const { amount, method, exchange_rate, shippingFee, cart } = req.body
             const date = Date.now()
             const user_id = req.user_id
