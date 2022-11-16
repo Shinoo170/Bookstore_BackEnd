@@ -59,6 +59,7 @@ exports.getSeriesDetails = async (req, res) => {
                 status: 1,
                 price: 1,
                 img: 1,
+                amount: 1,
             }).limit(8).toArray()
         const novel = await db.collection('products')
             .find({ _id: { $in: seriesData.products.novelId} })
@@ -74,6 +75,7 @@ exports.getSeriesDetails = async (req, res) => {
                 status: 1,
                 price: 1,
                 img: 1,
+                amount: 1,
             }).limit(8).toArray()
         const other = await db.collection('products').find({ _id: { $in: seriesData.products.otherId} }).limit(8).toArray()
         if(seriesData && manga && novel && other){
@@ -113,7 +115,9 @@ exports.getProduct = async (req, res) => {
         const params = req.params
         const query = req.query
         const db = mongoUtil.getDb()
+        const target = query.category.toLowerCase() + 'Id'
         const productDetails = await db.collection('products').findOne({ url: params.productURL })
+
         const seriesDetails = await db.collection('series').findOne({ seriesId: parseInt(query.seriesId)},{
             projection: {
                 _id: 0,
@@ -121,23 +125,28 @@ exports.getProduct = async (req, res) => {
                 illustrator: 1,
                 publisher: 1,
                 genres: 1,
-            }
-        })
-        const target = query.category.toLowerCase() + 'Id'
-        const listProductId = await db.collection('series').findOne({seriesId: parseInt(query.seriesId)},{
-            projection: {
-                _id:0,
+                cosineSimilarity: 1,
                 products: { [target]: 1 }
             }
         })
+        
         const otherProducts = await db.collection('products').find({ 
-            _id : { $in: Object.values(listProductId.products)[0] },
+            _id : { $in: Object.values(seriesDetails.products)[0] },
             url: { $ne: params.productURL} 
         }).project({
             _id: 0
         }).limit(10).toArray()
 
-        const similarProducts = {}
+        const similarProducts = await db.collection('series').find({ 
+            seriesId : { $in: seriesDetails.cosineSimilarity.map(e => e.seriesId) },
+        }).project({
+            _id: 0,
+            seriesId: 1,
+            title: 1,
+            img: 1,
+            status: 1,
+        }).limit(10).toArray()
+
         if( productDetails === null ) res.status(404).send()
         else res.status(200).send({productDetails, seriesDetails, otherProducts , similarProducts})
     }catch(err){
@@ -185,7 +194,7 @@ exports.getLatestSeries = async (req, res) => {
 exports.getLatestProduct = async (req, res) => {
     try{
         const db = mongoUtil.getDb()
-        const data = await db.collection('products').find({}).sort({productId: -1}).toArray()
+        const data = await db.collection('products').find({}).limit(10).sort({productId: -1}).toArray()
         if(data){
             res.status(200).send(data)
         }else{
@@ -196,6 +205,25 @@ exports.getLatestProduct = async (req, res) => {
     }
 }
 
+exports.getMostSoldProduct = async (req, res) => {
+    try{
+        mongoUtil.connectToServer(async function(err, client){
+            if(err) res.status(500).send({message: 'Cannot connect to database', err})
+            const db = mongoUtil.getDb()
+            const data = await db.collection('products').find({}).limit(10).sort({sold: -1}).toArray()
+            if(data){
+                res.status(200).send(data)
+            }else{
+                res.status(400).send({message: 'No product found!', err})
+            }
+        })
+    }catch(err){
+        res.status(500).send({message: 'Server error', err})
+    }
+}
+
+
+// Genres
 exports.getAllGenres = async (req, res) => {
     try{
         const db = mongoUtil.getDb()
@@ -205,6 +233,69 @@ exports.getAllGenres = async (req, res) => {
         res.status(400).send({ message: 'error', err})
     }
 }
+
+// Bookmark
+exports.isUserSubscribe = async (req, res) => {
+    try {
+        mongoUtil.connectToServer(async function(err, client){
+            if (err) res.status(500).send({message: 'Cannot connect to database'})
+            var db = mongoUtil.getDb()
+            const seriesId = parseInt(req.query.seriesId)
+            const user_id = new ObjectId(req.user_id)
+            const data = await db.collection('series').findOne({ seriesId, subscribe: [user_id] })
+            if(data){
+                res.status(200).send(true)
+            } else {
+                res.status(200).send(false)
+            }
+        })
+    } catch (error) {
+        res.status(500).send({message: 'This service is not available'})
+    }
+}
+
+exports.addSubscriber = async (req, res) => {
+    try {
+        mongoUtil.connectToServer(async function(err, client){
+            if (err) res.status(500).send({message: 'Cannot connect to database'})
+            var db = mongoUtil.getDb()
+            const seriesId = parseInt(req.query.seriesId)
+            const _id = new ObjectId(req.user_id)
+            db.collection('series').updateOne({ seriesId }, {
+                $push: {
+                    subscribe: _id,
+                }
+            }, (err, result) => {
+                if(err || result.matchedCount != 1) return res.status(400).send({message: 'Error to add bookmark'})
+                res.status(201).send(true)
+            })
+        })
+    } catch (error) {
+        res.status(500).send({message: 'This service is not available'})
+    }
+}
+
+exports.removeSubscriber = async (req, res) => {
+    try {
+        mongoUtil.connectToServer(function(err, client){
+            if (err) res.status(500).send({message: 'Cannot connect to database'})
+            var db = mongoUtil.getDb()
+            const seriesId = parseInt(req.query.seriesId)
+            const _id = new ObjectId(req.user_id)
+            db.collection('series').updateOne({ seriesId }, {
+                $pull: {
+                    subscribe: _id,
+                }
+            }, (err, result) => {
+                if(err || result.matchedCount != 1) return res.status(400).send({message: 'Error to remove bookmark'})
+                res.status(201).send(false)
+            })
+        })
+    } catch (error) {
+        res.status(500).send({message: 'This service is not available'})
+    }
+}
+
 
 exports.review = async (req, res) => {
     try {
@@ -217,6 +308,34 @@ exports.review = async (req, res) => {
             review,
             score
         })
+        res.status(201).send({message: 'review success'})
+        const product = await db.collection('products').findOne({productId}, {
+            projection: {
+                _id: 0,
+                score: 1
+            }
+        })
+        const avg = Math.round(((product.score.avg * product.score.count) + score) / (product.score.count +1) *100)/100
+        db.collection('products').updateOne({productId}, {
+            $set : {
+                'score.avg' : avg
+            },
+            $inc: {
+                'score.count': 1
+            }
+        })
+        // db.collection('review').updateOne({ productId }, {
+        //     $set : {
+        //         productId,
+        //     },
+        //     $push : {
+        //         list: {
+        //             user_id: _id,
+        //             review,
+        //             score
+        //         }
+        //     }
+        // }, { upsert : true })
     } catch (error) {
         
     }
@@ -233,19 +352,21 @@ exports.getReview = async (req, res) => {
                     from: 'users',
                     localField: 'user_id',
                     foreignField: '_id',
-                    as: 'user'
+                    as: 'detail'
                 }
             },{
                 $project: {
                     "_id": 1,
+                    "user_id": 1,
                     "review": 1,
                     "productId": 1,
                     "score": 1,
-                    "user.userData.displayName": 1,
-                    "user.userData.img": 1,
+                    "detail.userData.displayName": 1,
+                    "detail.userData.img": 1,
                 }
             }])
             .toArray()
+
         res.send(data)
     } catch (error) {
         console.log(error)

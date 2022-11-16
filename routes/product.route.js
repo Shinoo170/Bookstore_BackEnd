@@ -22,6 +22,9 @@ router.get('/latestSeries', controller.getLatestSeries)
 // Get latest product
 router.get('/latestProduct', controller.getLatestProduct)
 
+// Get most sold product
+router.get('/mostSoldProduct', controller.getMostSoldProduct)
+
 router.get('/genres', controller.getAllGenres)
 
 // User add new review
@@ -29,5 +32,12 @@ router.post('/review', authJwt.verifyToken, controller.review)
 
 // Get review
 router.get('/review', controller.getReview)
+
+
+
+// Subscribe // Bookmark // Follow
+router.get('/subscribe', authJwt.verifyToken , controller.isUserSubscribe)
+router.put('/subscribe', authJwt.verifyToken, controller.addSubscriber)
+router.delete('/subscribe', authJwt.verifyToken, controller.removeSubscriber)
 
 module.exports = router

@@ -78,7 +78,7 @@ exports.signIn = async (req, res) => {
                 },
                 process.env.TOKEN_KEY,
                 {
-                    expiresIn: "7d"
+                    // expiresIn: "7d"
                 }
             )
             res.status(200).send({

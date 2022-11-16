@@ -5,9 +5,10 @@ const middleware = require('../middleware/adminProcess')
 const jwt_middleware = require('../middleware/authJwt')
 const controller = require('../controllers/adminRoute.controller')
 // jwt_middleware.adminVerify
-router.post('/addProduct', controller.addProduct )
 
-router.post('/addSeries', controller.addSeries )
+router.post('/addProduct', middleware.checkProduct, controller.addProduct )
+
+router.post('/addSeries', middleware.checkSeries, controller.addSeries )
 
 router.get('/reCalculateCos', controller.reCalculateCos)
 

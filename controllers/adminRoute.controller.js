@@ -22,7 +22,7 @@ exports.addProduct = async (req, res) => {
                 productId: result,
                 title: title.trim(),
                 url,
-                bookNum: parseInt(bookNum),
+                bookNum: bookNum,
                 category,
                 thai_category,
                 description,
@@ -40,13 +40,18 @@ exports.addProduct = async (req, res) => {
                 if(err) res.status(400).send({ message: "cannot add product", error: err.message })
                 const target = "products.total" + category.charAt(0).toUpperCase() + category.slice(1)
                 const addIdTarget = "products." + category + "Id"
-                db.collection('series').updateOne({seriesId: parseInt(seriesId)},{
+                const date = Date.now()
+                db.collection('series').updateOne({seriesId: parseInt(seriesId)}, {
                     $inc: {
                         "products.totalProducts": 1,
                         [target]: 1,
                     },
                     $push: {
                         [addIdTarget]: result.insertedId,
+                    },
+                    $set: {
+                        lastAddProduct: date,
+                        lastModify: date,
                     }
                 })
                 res.status(201).send({
@@ -78,6 +83,7 @@ exports.addSeries = async (req, res) => {
                 img,
                 score: { avg:0 , count:0 },
                 addDate: date,
+                lastAddProduct: date,
                 lastModify: date,
                 status: 'available',
                 products: {
@@ -106,34 +112,43 @@ exports.addSeries = async (req, res) => {
     }
 }
 
-exports.reCalculateCos = (req, res) => {
-    var db = mongoUtil.getDb()
-    db.collection('series').find({}, {
-        projection: {
-            _id: 0,
-            seriesId: 1,
-            title: 1,
-            keywords: 1,
-        }
-    }).toArray( async (err, result) => {
-        const arr = [...result]
-        const length = arr.length
-        // get cosineSimilarity
-        const new_cosine_sim = Array(length).fill().map(() => Array(length));
-        var cosine_sim
-        for(let i=0; i<arr.length; i++){
-            for(let j=i+1; j<arr.length; j++){
-                cosine_sim = cosineSimilarity(arr[i], arr[j])
-                new_cosine_sim[i][j] = cosine_sim
-                new_cosine_sim[j][i] = cosine_sim
+exports.reCalculateCos = async (req, res) => {
+    try {
+        var db = mongoUtil.getDb()
+        const counter = await db.collection('counters').findOne({_id: 'seriesId'})
+        const productCounter = counter.seq - 1
+        db.collection('series').find({}, {
+            projection: {
+                _id: 0,
+                seriesId: 1,
+                title: 1,
+                keywords: 1,
             }
-            new_cosine_sim[i][i] = 1
-        }
-        res.send(new_cosine_sim)
-        db.collection('cosineTable').updateOne({name: 'origin'},{
-            $set: {data: new_cosine_sim}
+        }).toArray( async (err, result) => {
+            const arr = [...result]
+            const length = productCounter
+            // get cosineSimilarity
+            const new_cosine_sim = Array(productCounter).fill().map(() => Array(productCounter))
+            var cosine_sim
+
+            for(let i=0; i<arr.length; i++){
+                for(let j=i+1; j<arr.length; j++){
+                    cosine_sim = cosineSimilarity(arr[i], arr[j])
+                    new_cosine_sim[arr[i].seriesId-1][arr[j].seriesId-1] = cosine_sim
+                    new_cosine_sim[arr[j].seriesId-1][arr[i].seriesId-1] = cosine_sim
+                }
+                new_cosine_sim[arr[i].seriesId-1][arr[i].seriesId-1] = 1
+            }
+            res.send(new_cosine_sim)
+            db.collection('cosineTable').updateOne({name: 'origin'},{
+                $set: {data: new_cosine_sim}
+            })
+            sortCosineTable(new_cosine_sim)
         })
-    })
+    } catch (error) {
+        
+    }
+    
 }
 
 async function calculateCos(){
@@ -170,6 +185,7 @@ async function calculateCos(){
         db.collection('cosineTable').updateOne({name: 'origin'},{
             $set: {data: new_cosine_sim}
         })
+        sortCosineTable(new_cosine_sim)
     })
 }
 
@@ -211,6 +227,45 @@ function cosineSimilarity(p1, p2){
     }
     const result = AdotB / (Math.sqrt(lengthA) * Math.sqrt(lengthB))
     return result
+}
+
+function sortCosineTable(data){
+    try {
+        var db = mongoUtil.getDb()
+        var newData = []
+        data.forEach((element, index) => {
+            var sort = {seriesId: index+1}
+            var temp = []
+            element.forEach((e, i) => {
+                // Not include self product
+                if(index != i)
+                    temp.push({seriesId: i+1, value: e})
+            })
+            temp.sort((a, b) => {
+                if ( a.value > b.value ){
+                    return -1;
+                }
+                if ( a.value < b.value ){
+                    return 1;
+                }
+                return 0;
+            })
+            sort.data = temp
+            newData.push(sort)
+            db.collection('series').updateOne({seriesId: index+1},{
+                $set: {
+                    cosineSimilarity: temp
+                }
+            })
+        })
+        // var newData = JSON.stringify(newData)
+        db.collection('cosineTable').updateOne({name: 'sort'}, {
+            $set: { data: newData }
+        })
+    } catch (error) {
+        
+    }
+    
 }
 
 exports.addGenres = async (req, res) => {
