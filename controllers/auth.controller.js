@@ -6,18 +6,6 @@ mongoUtil.connectToServer(function(err, client){
 
 const bcrypt = require('bcryptjs')
 const jwt = require('jsonwebtoken')
-var omise = require('omise')({
-    'publicKey': process.env.OMISE_PUBLIC_KEY,
-    'secretKey': process.env.OMISE_SECRET_KEY
-})
-
-const createOmiseCustomer = async (email) => {
-    const customer = await omise.customers.create({
-        email,
-        'description': `email : ${email}`,
-    })
-    return customer
-}
 
 exports.signup = async (req, res) => {
     var db = mongoUtil.getDb()
