@@ -190,10 +190,10 @@ exports.deleteItem = async (req, res) => {
 // }
 
 exports.placeOrder = async (req, res) => {
+    if(req.body.method !== 'metamask') return res.status(400).send({message : "Please use another service"})
     mongoUtil.connectToServer(async function(err, client){
         if (err) return res.status(503).send({message : "Cannot connect to database"})
         try {
-            return res.send('place order success')
             const { amount, method, exchange_rate, shippingFee, cart } = req.body
             const date = Date.now()
             const user_id = req.user_id
@@ -229,11 +229,11 @@ exports.placeOrder = async (req, res) => {
             })
 
             // If all product is out of stock
-            if( (totalPriceSummary === shippingFee) && (method === 'credit_card') ){
-                return res.status(400).send({
-                    message: 'All product out of stock'
-                })
-            }
+            // if( (totalPriceSummary === shippingFee) && (method === 'credit_card') ){
+            //     return res.status(400).send({
+            //         message: 'All product out of stock'
+            //     })
+            // }
 
             finalOrder.forEach(async element => {
                 await db.collection('products').updateOne({productId: element.productId}, {
@@ -282,68 +282,7 @@ exports.placeOrder = async (req, res) => {
 
             })
 
-            if(method === 'credit_card'){
-                var charge
-                try {
-                    // Charge
-                    const token = req.body.token
-                    charge = await chargeOmise(totalPriceSummary, token)
-                } catch (error) {
-                    finalOrder.forEach(async element => {
-                        await db.collection('products').updateOne({productId: element.productId}, {
-                            $inc : { amount: element.amount, sold: -element.amount }
-                        })
-                    })
-                    db.collection('orders').updateOne({orderId}, {
-                        $set: {
-                            status: 'cancel',
-                            cancel_message: 'Payment refuse',
-                            failure_code: 'payment_error',
-                            failure_message: 'payment error',
-                        }
-                    })
-                    return
-                }
-                if(charge.status !== 'successful'){
-                    // ! Charge error
-                    finalOrder.forEach(async element => {
-                        await db.collection('products').updateOne({productId: element.productId}, {
-                            $inc : { amount: element.amount ,sold: -element.amount}
-                        })
-                    })
-                    db.collection('orders').updateOne({orderId}, {
-                        $set: {
-                            status: 'cancel',
-                            cancel_message: 'Payment refuse',
-                            failure_code: charge.failure_code,
-                            failure_message: charge.failure_message,
-                        }
-                    })
-                    return
-                } else {
-                    // * Charge success
-                    const paidDate = Date.now()
-                    await db.collection('orders').updateOne({orderId},{
-                        $set : {
-                            paymentDetails: {
-                                bank: charge.card.bank,
-                                brand: charge.card.brand,
-                                total: charge.amount/100,
-                                net: charge.net/100,
-                                fee: charge.fee/100,
-                                fee_vat: charge.fee_vat/100,
-                                omiseCardId: charge.card.id,
-                                omiseChargeId: charge.id,
-                                omiseTransactionId: charge.transaction,
-                                created_at: paidDate,
-                                date: new Date(paidDate).toISOString(),
-                            },
-                            status: 'paid',
-                        }
-                    })
-                    return
-                }
-            } else if( method === 'metamask') {
+            if( method === 'metamask') {
                 try {
                     const { hash } = req.body
                     const chain = EvmChain.BSC_TESTNET
@@ -357,7 +296,6 @@ exports.placeOrder = async (req, res) => {
                             transactionHash: hash,
                             chain,
                         })
-                        // console.log('wait 1s')
                         await new Promise((resolve) => {
                             setTimeout(resolve, 1000)
                         })
@@ -394,7 +332,6 @@ exports.placeOrder = async (req, res) => {
                         }
                     }
                     // ! address
-
                     const paidDate = Date.now()
                     var orderUpdate = {
                         $set: {
@@ -436,3 +373,67 @@ exports.placeOrder = async (req, res) => {
         }
     })
 }
+
+
+// if(method === 'credit_card'){
+//     var charge
+//     try {
+//         // Charge
+//         const token = req.body.token
+//         charge = await chargeOmise(totalPriceSummary, token)
+//     } catch (error) {
+//         finalOrder.forEach(async element => {
+//             await db.collection('products').updateOne({productId: element.productId}, {
+//                 $inc : { amount: element.amount, sold: -element.amount }
+//             })
+//         })
+//         db.collection('orders').updateOne({orderId}, {
+//             $set: {
+//                 status: 'cancel',
+//                 cancel_message: 'Payment refuse',
+//                 failure_code: 'payment_error',
+//                 failure_message: 'payment error',
+//             }
+//         })
+//         return
+//     }
+//     if(charge.status !== 'successful'){
+//         // ! Charge error
+//         finalOrder.forEach(async element => {
+//             await db.collection('products').updateOne({productId: element.productId}, {
+//                 $inc : { amount: element.amount ,sold: -element.amount}
+//             })
+//         })
+//         db.collection('orders').updateOne({orderId}, {
+//             $set: {
+//                 status: 'cancel',
+//                 cancel_message: 'Payment refuse',
+//                 failure_code: charge.failure_code,
+//                 failure_message: charge.failure_message,
+//             }
+//         })
+//         return
+//     } else {
+//         // * Charge success
+//         const paidDate = Date.now()
+//         await db.collection('orders').updateOne({orderId},{
+//             $set : {
+//                 paymentDetails: {
+//                     bank: charge.card.bank,
+//                     brand: charge.card.brand,
+//                     total: charge.amount/100,
+//                     net: charge.net/100,
+//                     fee: charge.fee/100,
+//                     fee_vat: charge.fee_vat/100,
+//                     omiseCardId: charge.card.id,
+//                     omiseChargeId: charge.id,
+//                     omiseTransactionId: charge.transaction,
+//                     created_at: paidDate,
+//                     date: new Date(paidDate).toISOString(),
+//                 },
+//                 status: 'paid',
+//             }
+//         })
+//         return
+//     }
+// }
