@@ -4,17 +4,21 @@ mongoUtil.connectToServer(function(err, client){
     if (err) console.log(err);
 })
 
+const { MongoClient } = require('mongodb')
+const ObjectId = require('mongodb').ObjectId
 const bcrypt = require('bcryptjs')
 const jwt = require('jsonwebtoken')
 
 exports.signup = async (req, res) => {
-    var db = mongoUtil.getDb()
+    const client = new MongoClient(process.env.MONGODB_URI)
     try{
+        await client.connect()
+        const db = client.db(process.env.DB_NAME)
         const { email, password } = req.body
         // const omiseCustomer = await createOmiseCustomer(email)
         const encryptPassword = await bcrypt.hash(password, 10)
         const displayName = email.split('@')
-        await db.collection('users').insertOne({
+        const register =  await db.collection('users').insertOne({
             email,
             password: encryptPassword,
             role: "user",
@@ -32,24 +36,28 @@ exports.signup = async (req, res) => {
                 expired: Date.now() + 7*24*60*60*1000   // 7 days
             },
             order: [],
-        }, (err, result) => {
-            db.collection('unVerifiedEmail').insertOne({
-                email,
-                code: generateCode(),
-                date: Date.now()
-            })
+        })
+        await db.collection('unVerifiedEmail').insertOne({
+            email,
+            code: generateCode(),
+            date: Date.now()
         })
         res.status(201).send({
             message: "Register success"
         })
     } catch (err) {
-        res.status(400).send({ message: "error", error: err.message })
+        console.log(err)
+        res.status(500).send({message: 'This service not available', err})
+    } finally {
+        await client.close()
     }
 }
 
 exports.signIn = async (req, res) => {
-    var db = mongoUtil.getDb()
+    const client = new MongoClient(process.env.MONGODB_URI)
     try{
+        await client.connect()
+        const db = client.db(process.env.DB_NAME)
         let { user, password } = req.body
         // login by Email or Phone number
         let userData = await db.collection('users').findOne( {$or: [
@@ -82,11 +90,11 @@ exports.signIn = async (req, res) => {
                 error: "Username or password not match"
             })
         }
-    }catch(err){
-        res.status(400).send({
-            message: 'error',
-            error: err.message
-        })
+    } catch (err) {
+        console.log(err)
+        res.status(500).send({message: 'This service not available', err})
+    } finally {
+        await client.close()
     }
 }
 
@@ -95,38 +103,32 @@ function generateCode(){
 }
 
 exports.SendVerifyCode = async (req, res) => {
-    let { email } = req.body
-    var db = mongoUtil.getDb()
-    let findEmail = await db.collection('users').findOne({
-        email: req.body.email
-    })
-    if( findEmail ){
-        db.collection('unVerifiedEmail').findOneAndUpdate(
-            { email },
-            { code: generateCode(), date: Date.now() },
-            function( err, result ){
-                if (err){
-                    res.status(400).send({
-                        message: 'Cannot send verify code',
-                        error: err.message
-                    })
-                }
-                res.status(200).send({ message: 'send success'})
-            })
-    } else {
-       db.collection('unVerifiedEmail').insertOne({
-            email,
-            code: generateCode(),
-            date: Date.now()
-        }, function( err, result){
-            if (err){
-                res.status(400).send({
-                    message: 'Cannot send verify code',
-                    error: err.message
-                })
-            }
+    const client = new MongoClient(process.env.MONGODB_URI)
+    try{
+        await client.connect()
+        const db = client.db(process.env.DB_NAME)
+        let { email } = req.body
+        let findEmail = await db.collection('users').findOne({
+            email: req.body.email
+        })
+        if( findEmail ){
+            await db.collection('unVerifiedEmail').findOneAndUpdate(
+                { email },
+                { code: generateCode(), date: Date.now() },
+            )
             res.status(200).send({ message: 'send success'})
-        }) 
+        } else {
+            await db.collection('unVerifiedEmail').insertOne({
+                email,
+                code: generateCode(),
+                date: Date.now()
+            })
+            res.status(200).send({ message: 'send success'})
+        }
+    } catch (err) {
+        console.log(err)
+        res.status(500).send({message: 'This service not available', err})
+    } finally {
+        await client.close()
     }
-    
 }

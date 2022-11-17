@@ -19,28 +19,11 @@ module.exports = {
   },
 
   getRootDb: function() {
-    // _root_db.topology.isConnected()
     return _root_db
   },
 
-  getNextSequence( field, callback) {
-    _db.collection('counters').findOneAndUpdate(
-      { _id: field },
-      { $inc: { seq: 1 } },
-      function (err, result) {
-        if (err) {
-          callback(err, result)
-        }
-        callback(err, result.value.seq)
-      }
-    )
-  },
-
-  // when error
-  previousSequence( field ) {
-    _db.collection('counters').findOneAndUpdate(
-      { _id: field },
-      { $inc: { seq: -1 } }
-    )
-  },
+  async getNextSequence( db, field){
+    const result = await db.collection('counters').findOneAndUpdate( { _id: field },{ $inc: { seq: 1 } })
+    return result.value.seq
+  }
 }
