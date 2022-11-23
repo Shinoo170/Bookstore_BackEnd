@@ -5,6 +5,8 @@ mongoUtil.connectToServer(function(err, client){
 })
 const { MongoClient } = require('mongodb')
 const ObjectId = require('mongodb').ObjectId
+const Moralis = require('moralis').default
+const { EvmChain } = require('@moralisweb3/evm-utils')
   
 exports.addProduct = async (req, res) => {
     const client = new MongoClient(process.env.MONGODB_URI)
@@ -17,7 +19,7 @@ exports.addProduct = async (req, res) => {
         var url = title.trim().replaceAll(" ","-")
         if(category === 'novel' || category === 'manga'){
             url += '-เล่ม-' + bookNum + '-' + thai_category
-        }else{
+        } else {
             url +=  '-' + bookNum + '-สินค้า'
         }
         const date = Date.now()
@@ -43,7 +45,7 @@ exports.addProduct = async (req, res) => {
         const newProduct = await db.collection('products').insertOne(newData)
         const target = "products.total" + category.charAt(0).toUpperCase() + category.slice(1)
         const addIdTarget = "products." + category + "Id"
-        const updateSeries = await db.collection('series').updateOne({seriesId: parseInt(seriesId)}, {
+        const seriesData = await db.collection('series').findOneAndUpdate({seriesId: parseInt(seriesId)}, {
             $inc: {
                 "products.totalProducts": 1,
                 [target]: 1,
@@ -55,15 +57,90 @@ exports.addProduct = async (req, res) => {
                 lastAddProduct: date,
                 lastModify: date,
             }
+        }, {
+            projection: {
+                _id: 0,
+                subscribe: 1,
+            }
         })
         res.status(201).send({
             message: "Add product success",
+        })
+
+        // Notify to subscriber
+        const subscriber = seriesData.value.subscribe
+        const subscriber_email = await db.collection('users').find({ _id: { $in: subscriber} }).project({ _id:0, email: 1}).toArray()
+        console.log(subscriber_email)
+    } catch (err) {
+        console.log(err)
+        res.status(500).send({message: 'This service not available', err})
+    } finally {
+        // await client.close()
+    }
+}
+
+exports.changeProductData = async (req, res) => {
+    const client = new MongoClient(process.env.MONGODB_URI)
+    try{
+        await client.connect()
+        const db = client.db(process.env.DB_NAME)
+        const { seriesId, url, bookNum, category, thai_category, status, price, amount, description, isImageChange, isCategoryChange, isUrlChange } = req.body
+        const date = Date.now()
+        const updateData = {
+            bookNum,
+            status,
+            price,
+            amount,
+            description,
+            lastModify: date
+        }
+        if(isUrlChange){
+            updateData.url = req.body.newUrl
+        }
+        if(isImageChange) {
+            updateData.img = req.body.listImgURL
+        }
+        if(isCategoryChange){
+            updateData.category = category
+            updateData.thai_category = thai_category
+        }
+        await db.collection('products').updateOne({url},{
+            $set: updateData
+        })
+
+        const targetUrl = req.body.newUrl || url
+        if(isCategoryChange){
+            const _id = new ObjectId(req.body.id)
+            var previousTotalTarget = 'products.total' + req.body.previousCategory.charAt(0).toUpperCase() + req.body.previousCategory.slice(1)
+            var previousTargetId = 'products.' + req.body.previousCategory + 'Id'
+            var TotalTarget = 'products.total' + category.charAt(0).toUpperCase() + category.slice(1)
+            var TargetId = 'products.' + category + 'Id'
+            await db.collection('series').updateOne({seriesId: parseInt(seriesId)}, {
+                $inc: {
+                    [previousTotalTarget]: -1,
+                    [TotalTarget]: 1,
+                },
+                $push: {
+                    [TargetId]: _id,
+                },
+                $pull : {
+                    [previousTargetId]: _id,
+                },
+                $set: {
+                    lastModify: date,
+                }
+            })
+        }
+
+        res.status(201).send({
+            message: "update product success",
+            url: targetUrl,
         })
     } catch (err) {
         console.log(err)
         res.status(500).send({message: 'This service not available', err})
     } finally {
-        await client.close()
+        // await client.close()
     }
 }
 
@@ -112,9 +189,40 @@ exports.addSeries = async (req, res) => {
         console.log(err)
         res.status(500).send({message: 'This service not available', err})
     } finally {
-        await client.close()
+        // await client.close()
     }
 
+}
+
+exports.changeSeriesData = async (req, res) => {
+    const client = new MongoClient(process.env.MONGODB_URI)
+    try{
+        await client.connect()
+        const db = client.db(process.env.DB_NAME)
+        const { seriesId, title, author, illustrator, publisher, genres, keywords, img, description} = req.body
+        const date = Date.now()
+        await db.collection('series').updateOne({seriesId},{
+            $set: {
+                title: title.trim(),
+                author: author.trim(),
+                illustrator: illustrator.trim(),
+                publisher: publisher.trim(),
+                description,
+                genres,
+                keywords,
+                img,
+                lastModify: date,
+            } 
+        })
+        res.status(201).send({
+            message: "update series success",
+        })
+    } catch (err) {
+        console.log(err)
+        res.status(500).send({message: 'This service not available', err})
+    } finally {
+        // await client.close()
+    }
 }
 
 exports.reCalculateCos = async (req, res) => {
@@ -149,8 +257,11 @@ exports.reCalculateCos = async (req, res) => {
             })
             sortCosineTable(db, new_cosine_sim)
         })
-    } catch (error) {
-        
+    } catch (err) {
+        console.log(err)
+        res.status(500).send({message: 'This service not available', err})
+    } finally {
+        // await client.close()
     }
     
 }
@@ -285,6 +396,141 @@ exports.addGenres = async (req, res) => {
         console.log(err)
         res.status(500).send({message: 'This service not available', err})
     } finally {
-        await client.close()
+        // await client.close()
+    }
+}
+
+exports.getOrders = async (req, res) => {
+    const client = new MongoClient(process.env.MONGODB_URI)
+    try{
+        await client.connect()
+        const db = client.db(process.env.DB_NAME)
+
+        var status_sort = req.query.sort || 'all'
+        var pages = req.query.pages || 1
+        var pageLimit = 10
+        var query = {}
+        // if status = 'all' query condition = {}
+        if(status_sort !== 'all'){
+            query = { status: status_sort }
+        }
+        var sort = {'orderId': -1}
+        if(status_sort === 'paid'){
+            sort = { 'paymentDetails.created_at': 1 }
+        }
+        const order = await db.collection('orders').find(query).sort(sort).limit(pageLimit).skip((pages-1) * pageLimit).toArray()
+        res.status(200).send(order)
+    } catch (err) {
+        console.log(err)
+        res.status(500).send({message: 'This service not available', err})
+    } finally {
+        // await client.close()
+    }
+}
+
+exports.getAllOrders = async (req, res) => {
+    const client = new MongoClient(process.env.MONGODB_URI)
+    try{
+        await client.connect()
+        const db = client.db(process.env.DB_NAME)
+        const order = await db.collection('orders').find().sort({ 'orderId': -1 }).toArray()
+        res.status(200).send(order)
+    } catch (err) {
+        console.log(err)
+        res.status(500).send({message: 'This service not available', err})
+    } finally {
+        // await client.close()
+    }
+}
+
+exports.getPaidOrder = async (req, res) => {
+    const client = new MongoClient(process.env.MONGODB_URI)
+    try{
+        await client.connect()
+        const db = client.db(process.env.DB_NAME)
+        const order = await db.collection('orders').find({status: { $in: ['paid'] }}).sort({ 'paymentDetails.created_at': 1}).toArray()
+        res.status(200).send(order)
+    } catch (err) {
+        console.log(err)
+        res.status(500).send({message: 'This service not available', err})
+    } finally {
+        // await client.close()
+    }
+}
+
+exports.getOrderDetails = async (req, res) => {
+    const client = new MongoClient(process.env.MONGODB_URI)
+    try{
+        await client.connect()
+        const db = client.db(process.env.DB_NAME)
+        const orderId = req.query.orderId
+        const order = await db.collection('orders').findOne({ orderId: parseInt(orderId) })
+        var productIdList = order.cart.map(element => { return element.productId })
+        var productDetails = await db.collection('products').find({ productId: { $in: productIdList }
+        }).project({
+            _id: 0,
+            seriesId: 1,
+            productId: 1,
+            title: 1,
+            url: 1,
+            bookNum: 1,
+            category: 1,
+            thai_category: 1,
+            price: 1,
+            amount: 1,
+            img: 1,
+        }).toArray()
+
+        order.cart.map((element) => {
+            for(let i=0; i<productDetails.length; i++){
+                if(element.productId === productDetails[i].productId){
+                    productDetails[i].amount = element.amount
+                    productDetails[i].price = element.price
+                }
+            }
+        })
+        res.status(200).send({order, productDetails})
+    } catch (err) {
+        console.log(err)
+        res.status(500).send({message: 'This service not available', err})
+    } finally {
+        // await client.close()
+    }
+}
+
+exports.updateOrder = async (req, res) => {
+    const client = new MongoClient(process.env.MONGODB_URI)
+    try{
+        await client.connect()
+        const db = client.db(process.env.DB_NAME)
+        const { orderId, status } = req.body
+        var update = {}
+        if(status === 'delivered'){
+            const { trackingNumber } = req.body
+            update = {
+                $set: {
+                    status,
+                    trackingNumber
+                }
+            }
+        } else if(status === 'cancel'){
+            const { cancelMessage } = req.body
+            update = {
+                $set: {
+                    status,
+                    cancel_message: cancelMessage,
+                    failure_code: 'cancel_by_admin',
+                    failure_message: cancelMessage,
+                }
+            }
+        }
+        await db.collection('orders').updateOne({ orderId: parseInt(orderId) }, update)
+        
+        res.status(200).send()
+    } catch (err) {
+        console.log(err)
+        res.status(500).send({message: 'This service not available', err})
+    } finally {
+        // await client.close()
     }
 }

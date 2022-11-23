@@ -10,69 +10,6 @@ const ethers = require('ethers')
 //     'secretKey': process.env.OMISE_SECRET_KEY
 // })
 
-// Bookmark
-// ! no longer available
-exports.getBookmark = async (req, res) => {
-    return res.status(500).send({message: 'This service is not available'})
-    try {
-        mongoUtil.connectToServer(async function(err, client){
-            if (err) res.status(50).send({message: 'Cannot connect to database'})
-            var db = mongoUtil.getDb()
-            const _id = new ObjectId(req.user_id)
-            const data = await db.collection('users').findOne({ _id, bookmark: [parseInt(req.query.seriesId)] })
-            if(data){
-                res.status(200).send(true)
-            } else {
-                res.status(200).send(false)
-            }
-        })
-    } catch (error) {
-        res.status(500).send({message: 'This service is not available'})
-    }
-}
-// ! no longer available
-exports.addNewBookmark = async (req, res) => {
-    return res.status(500).send({message: 'This service is not available'})
-    try {
-        mongoUtil.connectToServer(async function(err, client){
-            if (err) res.status(500).send({message: 'Cannot connect to database'})
-            var db = mongoUtil.getDb()
-            const _id = new ObjectId(req.user_id)
-            db.collection('users').updateOne({ _id }, {
-                $push: {
-                    bookmark: parseInt(req.query.seriesId),
-                }
-            }, (err, result) => {
-                if(err || result.matchedCount != 1) return res.status(400).send({message: 'Error to add bookmark'})
-                res.status(201).send(true)
-            })
-        })
-    } catch (error) {
-        res.status(500).send({message: 'This service is not available'})
-    }
-}
-// ! no longer available
-exports.removeBookmark = async (req, res) => {
-    return res.status(500).send({message: 'This service is not available'})
-    try {
-        mongoUtil.connectToServer(async function(err, client){
-            if (err) res.status(500).send({message: 'Cannot connect to database'})
-            var db = mongoUtil.getDb()
-            const _id = new ObjectId(req.user_id)
-            await db.collection('users').updateOne({ _id }, {
-                $pull: {
-                    bookmark: parseInt(req.query.seriesId),
-                }
-            }, (err, result) => {
-                if(err || result.matchedCount != 1) return res.status(400).send({message: 'Error to remove bookmark'})
-                res.status(201).send(false)
-            })
-        })
-    } catch (error) {
-        res.status(500).send({message: 'This service is not available'})
-    }
-}
-
 // Cart
 exports.getCart = async (req, res) => {
     const client = new MongoClient(process.env.MONGODB_URI)
@@ -107,7 +44,7 @@ exports.getCart = async (req, res) => {
         console.log(err)
         res.status(500).send({message: 'This service not available', err})
     } finally {
-        await client.close()
+        // await client.close()
     }
 }
 
@@ -148,7 +85,7 @@ exports.addToCart = async (req, res) => {
         console.log(err)
         res.status(500).send({message: 'This service not available', err})
     } finally {
-        await client.close()
+        // await client.close()
     }
 }
 
@@ -172,7 +109,7 @@ exports.deleteItem = async (req, res) => {
         console.log(err)
         res.status(500).send({message: 'This service not available', err})
     } finally {
-        await client.close()
+        // await client.close()
     }
 }
 
@@ -225,7 +162,7 @@ exports.placeOrder = async (req, res) => {
             var finalAmount = element.amount
             if(element.amount > product[productIndex].amount){
                 finalAmount = product[productIndex].amount
-                refund += Math.round( (element.amount - finalAmount) * product[productIndex].price / exchange_rate * 100) / 100
+                refund += Math.round( ((element.amount - finalAmount) * product[productIndex].price) / exchange_rate * 100) / 100
             }
             totalPriceSummary +=  Math.round(finalAmount * product[productIndex].price / exchange_rate * 100) / 100
             return {
@@ -241,20 +178,21 @@ exports.placeOrder = async (req, res) => {
             })
         })
 
+        const total = Math.round(amount * 100) / 100
         const orderId = await mongoUtil.getNextSequence(db, 'orderId')
         var orderDetail = {
             orderId,
             user_id,
-            total: amount,
+            total,
             shippingFee: shippingFee,
             exchange_rate,
             method,
             cart: finalOrder,
             created_at: date,
-            date: new Date(date).toISOString(),
+            date: new Date(date).toLocaleString('en-US', { hour12: false}),
             paymentDetails: {},
             address: {},
-            status: 'place_order',
+            status: 'ordered',
         }
         if(( refund > 0 ) && (method === 'metamask') ){
             orderDetail.paymentDetails.refund = true
@@ -263,6 +201,7 @@ exports.placeOrder = async (req, res) => {
             }
         }
         await db.collection('orders').insertOne(orderDetail)
+        // ! reset cart
         await db.collection('users').updateOne({ _id }, {
             $push: { order: orderId },
             // $set : {
@@ -295,6 +234,20 @@ exports.placeOrder = async (req, res) => {
                     setTimeout(resolve, 1000)
                 })
             }
+            // ! address
+            const paidDate = Date.now()
+            var orderUpdate = {
+                $set: {
+                    paymentDetails: {
+                        total,
+                        net: totalPriceSummary,
+                        hash,
+                        created_at: paidDate,
+                        date: new Date(paidDate).toLocaleString('en-US', { hour12: false}),
+                    },
+                    status: 'paid',
+                }
+            }
             if(refund > 0){
                 let abi = [
                     "function name() public view returns (string)",
@@ -321,29 +274,13 @@ exports.placeOrder = async (req, res) => {
                 )
                 refundTx.wait()
                 refundHash = refundTx.hash
-            }
-            // ! address
-            const paidDate = Date.now()
-            var orderUpdate = {
-                $set: {
-                    paymentDetails: {
-                        total: amount,
-                        net: totalPriceSummary,
-                        hash,
-                        created_at: paidDate,
-                        date: new Date(paidDate).toISOString(),
-                    },
-                    status: 'paid',
-                }
-            }
-            if(refund > 0){
                 orderUpdate.$set.paymentDetails.refund = true
                 orderUpdate.$set.paymentDetails.refundDetails = {
                     refundTotal: refund,
                     hash: refundHash,
                 }
                 if( totalPriceSummary === 0 ){
-                    orderUpdate.$set.status = 'refund'
+                    orderUpdate.$set.status = 'cancel'
                     orderUpdate.$set.cancel_message = 'all product out of stock'
                     orderUpdate.$set.failure_code = 'all_product_out_of_stock'
                     orderUpdate.$set.failure_message = 'all product out of stock'
@@ -356,10 +293,9 @@ exports.placeOrder = async (req, res) => {
         console.log(err)
         res.status(500).send({message: 'This service not available', err})
     } finally {
-        await client.close()
+        // await client.close()
     }
 }
-
 
 // if(method === 'credit_card'){
 //     var charge
@@ -423,3 +359,74 @@ exports.placeOrder = async (req, res) => {
 //         return
 //     }
 // }
+
+exports.getSubscribes = async (req, res) => {
+    const client = new MongoClient(process.env.MONGODB_URI)
+    try{
+        await client.connect()
+        const db = client.db(process.env.DB_NAME)
+        const _id = new ObjectId(req.user_id)
+        const subscribeData = await db.collection('users').findOne({ _id }, {
+            projection: {
+                _id: 0,
+                subscribe : 1
+            }
+        })
+        const data = await db.collection('series')
+            .find({seriesId : { $in : subscribeData.subscribe }})
+            .project({
+                _id: 0,
+                seriesId: 1,
+                title: 1,
+                img: 1,
+                score: 1,
+                addDate: 1,
+                lastModify: 1,
+                status: 1,
+            }).toArray()
+        res.status(200).send(data)
+    } catch (err) {
+        console.log(err)
+        res.status(500).send({message: 'This service not available', err})
+    } finally {
+        // await client.close()
+    }
+}
+
+exports.getWishlists = async (req, res) => {
+    const client = new MongoClient(process.env.MONGODB_URI)
+    try{
+        await client.connect()
+        const db = client.db(process.env.DB_NAME)
+        const _id = new ObjectId(req.user_id)
+        const wishlistsData = await db.collection('users').findOne({ _id }, {
+            projection: {
+                _id: 0,
+                wishlists : 1
+            }
+        })
+        const data = await db.collection('products')
+            .find({productId : { $in : wishlistsData.wishlists }})
+            .project({
+                _id: 0,
+                productId: 1,
+                seriesId: 1,
+                title: 1,
+                url: 1,
+                bookNum: 1,
+                category: 1,
+                thai_category: 1,
+                status: 1,
+                price: 1,
+                score: 1,
+                img: 1,
+                amount: 1,
+            }).toArray()
+        res.status(200).send(data)
+    } catch (err) {
+        console.log(err)
+        res.status(500).send({message: 'This service not available', err})
+    } finally {
+        // await client.close()
+    }
+}

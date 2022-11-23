@@ -6,12 +6,26 @@ const jwt_middleware = require('../middleware/authJwt')
 const controller = require('../controllers/adminRoute.controller')
 // jwt_middleware.adminVerify
 
-router.post('/addProduct', middleware.checkProduct, controller.addProduct )
+router.post('/addProduct', [jwt_middleware.isAdmin, middleware.checkProduct], controller.addProduct )
 
-router.post('/addSeries', middleware.checkSeries, controller.addSeries )
+router.patch('/product', [jwt_middleware.isAdmin, middleware.checkProductName], controller.changeProductData)
 
-router.get('/reCalculateCos', controller.reCalculateCos)
+router.post('/addSeries', [jwt_middleware.isAdmin, middleware.checkSeries], controller.addSeries )
 
-router.post('/addGenres', controller.addGenres)
+router.patch('/series', [jwt_middleware.isAdmin, middleware.checkSeries], controller.changeSeriesData)
+
+router.get('/reCalculateCos', jwt_middleware.isAdmin, controller.reCalculateCos)
+
+router.get('/getOrders', jwt_middleware.isAdmin, controller.getOrders)
+
+router.get('/getAllOrders', jwt_middleware.isAdmin, controller.getAllOrders)
+
+router.get('/getPaidOrder', jwt_middleware.isAdmin, controller.getPaidOrder)
+
+router.patch('/updateOrder', jwt_middleware.isAdmin, controller.updateOrder)
+
+router.get('/getOrderDetails', jwt_middleware.isAdmin, controller.getOrderDetails)
+
+router.post('/addGenres', jwt_middleware.isAdmin, controller.addGenres)
 
 module.exports = router

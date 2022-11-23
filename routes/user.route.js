@@ -16,4 +16,8 @@ router.patch('/cart', authJwt.verifyToken, controller.deleteItem)
 // Place order, create omise customer and charges
 router.post('/placeOrder', authJwt.verifyToken, controller.placeOrder)
 
+// subscribe and wishlists
+router.get('/getSubscribes', authJwt.verifyToken, controller.getSubscribes)
+router.get('/getWishlists', authJwt.verifyToken, controller.getWishlists)
+
 module.exports = router

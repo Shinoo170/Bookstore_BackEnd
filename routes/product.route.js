@@ -16,6 +16,8 @@ router.get('/productInSeries', controller.getProductInSeries)
 // Get specific product
 router.get('/productDetail/:productURL', controller.getProduct)
 
+router.get('/productDetailLessData/:productURL', controller.getProductLessData)
+
 // Get latest series
 router.get('/latestSeries', controller.getLatestSeries)
 
@@ -33,11 +35,14 @@ router.post('/review', authJwt.verifyToken, controller.review)
 // Get review
 router.get('/review', controller.getReview)
 
-
-
-// Subscribe // Bookmark // Follow
+// Subscribe 
 router.get('/subscribe', authJwt.verifyToken , controller.isUserSubscribe)
 router.put('/subscribe', authJwt.verifyToken, controller.addSubscriber)
 router.delete('/subscribe', authJwt.verifyToken, controller.removeSubscriber)
+
+// wishlist
+router.get('/wishlist', authJwt.verifyToken , controller.isUserWishlist)
+router.put('/wishlist', authJwt.verifyToken, controller.addWishlist)
+router.delete('/wishlist', authJwt.verifyToken, controller.removeWishlist)
 
 module.exports = router

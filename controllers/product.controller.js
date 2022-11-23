@@ -34,7 +34,7 @@ exports.getAllSeries = async (req, res) => {
         console.log(err)
         res.status(500).send({message: 'This service not available', err})
     } finally {
-        await client.close()
+        // await client.close()
     }
 }
 
@@ -44,9 +44,15 @@ exports.getSeriesDetails = async (req, res) => {
         await client.connect()
         const db = client.db(process.env.DB_NAME)
         const params = req.params
-        const seriesData = await db.collection('series').findOne({ seriesId: parseInt(params.seriesId) })
+        const seriesData = await db.collection('series').findOne({ seriesId: parseInt(params.seriesId) }, {
+            projection: {
+                _id: 0,
+                cosineSimilarity: 0,
+                subscribe: 0,
+            }
+        })
         const manga = await db.collection('products')
-            .find({ _id: { $in: seriesData.products.mangaId} })
+            .find({ _id: { $in: seriesData.products.mangaId } })
             .project({
                 _id: 0,
                 productId: 1,
@@ -58,11 +64,12 @@ exports.getSeriesDetails = async (req, res) => {
                 thai_category: 1,
                 status: 1,
                 price: 1,
+                score: 1,
                 img: 1,
                 amount: 1,
             }).limit(8).toArray()
         const novel = await db.collection('products')
-            .find({ _id: { $in: seriesData.products.novelId} })
+            .find({ _id: { $in: seriesData.products.novelId } })
             .project({
                 _id: 0,
                 productId: 1,
@@ -74,12 +81,14 @@ exports.getSeriesDetails = async (req, res) => {
                 thai_category: 1,
                 status: 1,
                 price: 1,
+                score: 1,
                 img: 1,
                 amount: 1,
             }).limit(8).toArray()
         const other = await db.collection('products').find({ _id: { $in: seriesData.products.otherId} }).limit(8).toArray()
+        
         if(seriesData && manga && novel && other){
-            res.status(200).send({seriesData,productData: { manga, novel, other}})
+            res.status(200).send({seriesData, productData: { manga, novel, other} })
         } else {
             res.status(400).send({ message: 'No series found!' })
         }
@@ -87,7 +96,7 @@ exports.getSeriesDetails = async (req, res) => {
         console.log(err)
         res.status(500).send({message: 'This service not available', err})
     } finally {
-        await client.close()
+        // await client.close()
     }
 }
 
@@ -114,7 +123,7 @@ exports.getProductInSeries = async (req, res) => {
         console.log(err)
         res.status(500).send({message: 'This service not available', err})
     } finally {
-        await client.close()
+        // await client.close()
     }
 }
 
@@ -155,6 +164,7 @@ exports.getProduct = async (req, res) => {
             title: 1,
             img: 1,
             status: 1,
+            score: 1,
         }).limit(10).toArray()
 
         if( productDetails === null ) res.status(404).send()
@@ -163,7 +173,35 @@ exports.getProduct = async (req, res) => {
         console.log(err)
         res.status(500).send({message: 'This service not available', err})
     } finally {
-        await client.close()
+        // await client.close()
+    }
+}
+
+exports.getProductLessData = async (req, res) => {
+    const client = new MongoClient(process.env.MONGODB_URI)
+    try{
+        await client.connect()
+        const db = client.db(process.env.DB_NAME)
+        const params = req.params
+        const query = req.query
+        const productDetails = await db.collection('products').findOne({ url: params.productURL })
+
+        const seriesDetails = await db.collection('series').findOne({ seriesId: parseInt(query.seriesId)},{
+            projection: {
+                _id: 0,
+                title: 1,
+            }
+        })
+        if( productDetails === null ) res.status(404).send()
+        else {
+            productDetails.seriesTitle = seriesDetails.title
+            res.status(200).send(productDetails)
+        }
+    } catch (err) {
+        console.log(err)
+        res.status(500).send({message: 'This service not available', err})
+    } finally {
+        // await client.close()
     }
 }
 
@@ -200,7 +238,7 @@ exports.getLatestSeries = async (req, res) => {
         console.log(err)
         res.status(500).send({message: 'This service not available', err})
     } finally {
-        await client.close()
+        // await client.close()
     }
 }
 
@@ -219,7 +257,7 @@ exports.getLatestProduct = async (req, res) => {
         console.log(err)
         res.status(500).send({message: 'This service not available', err})
     } finally {
-        await client.close()
+        // await client.close()
     }
 }
 
@@ -238,10 +276,9 @@ exports.getMostSoldProduct = async (req, res) => {
         console.log(err)
         res.status(500).send({message: 'This service not available', err})
     } finally {
-        await client.close()
+        // await client.close()
     }
 }
-
 
 // Genres
 exports.getAllGenres = async (req, res) => {
@@ -255,11 +292,11 @@ exports.getAllGenres = async (req, res) => {
         console.log(err)
         res.status(500).send({message: 'This service not available', err})
     } finally {
-        await client.close()
+        // await client.close()
     }
 }
 
-// Bookmark
+// Subscribe
 exports.isUserSubscribe = async (req, res) => {
     const client = new MongoClient(process.env.MONGODB_URI)
     try{
@@ -277,7 +314,7 @@ exports.isUserSubscribe = async (req, res) => {
         console.log(err)
         res.status(500).send({message: 'This service not available', err})
     } finally {
-        await client.close()
+        // await client.close()
     }
 }
 
@@ -288,12 +325,17 @@ exports.addSubscriber = async (req, res) => {
         const db = client.db(process.env.DB_NAME)
         const seriesId = parseInt(req.query.seriesId)
         const _id = new ObjectId(req.user_id)
-        const result = await db.collection('series').updateOne({ seriesId }, {
+        const seriesSubscribe = await db.collection('series').updateOne({ seriesId }, {
             $push: {
-                subscribe: _id,
+                subscribe: _id
             }
         })
-        if(result.modifiedCount === 1){
+        const userSubscribe = await db.collection('users').updateOne({ _id }, {
+            $push: {
+                subscribe: seriesId,
+            }
+        })
+        if(seriesSubscribe.modifiedCount === 1 && userSubscribe.modifiedCount === 1){
             res.status(201).send(true)
         } else {
             res.status(500).send({message: 'Cannot subscribe', err})
@@ -302,7 +344,7 @@ exports.addSubscriber = async (req, res) => {
         console.log(err)
         res.status(500).send({message: 'This service not available', err})
     } finally {
-        await client.close()
+        // await client.close()
     }
 }
 
@@ -313,24 +355,110 @@ exports.removeSubscriber = async (req, res) => {
         const db = client.db(process.env.DB_NAME)
         const seriesId = parseInt(req.query.seriesId)
         const _id = new ObjectId(req.user_id)
-        const result = await db.collection('series').updateOne({ seriesId }, {
+        const seriesSubscribe = await db.collection('series').updateOne({ seriesId }, {
             $pull: {
                 subscribe: _id,
             }
         })
-        if(result.modifiedCount === 1){
+        const userSubscribe = await db.collection('users').updateOne({ _id }, {
+            $pull: {
+                subscribe: seriesId,
+            }
+        })
+        if(seriesSubscribe.modifiedCount > 0 && userSubscribe.modifiedCount > 0){
             res.status(201).send(false)
         } else {
-            res.status(500).send({message: 'Cannot subscribe', err})
+            res.status(500).send({message: 'Cannot subscribe'})
         }
     } catch (err) {
         console.log(err)
         res.status(500).send({message: 'This service not available', err})
     } finally {
-        await client.close()
+        // await client.close()
     }
 }
 
+// wishlists
+exports.isUserWishlist = async (req, res) => {
+    const client = new MongoClient(process.env.MONGODB_URI)
+    try{
+        await client.connect()
+        const db = client.db(process.env.DB_NAME)
+        const productId = parseInt(req.query.productId)
+        const user_id = new ObjectId(req.user_id)
+        const data = await db.collection('products').findOne({ productId, wishlists: [user_id] })
+        if(data){
+            res.status(200).send(true)
+        } else {
+            res.status(200).send(false)
+        }
+    } catch (err) {
+        console.log(err)
+        res.status(500).send({message: 'This service not available', err})
+    } finally {
+        // await client.close()
+    }
+}
+
+exports.addWishlist = async (req, res) => {
+    const client = new MongoClient(process.env.MONGODB_URI)
+    try{
+        await client.connect()
+        const db = client.db(process.env.DB_NAME)
+        const productId = parseInt(req.query.productId)
+        const _id = new ObjectId(req.user_id)
+        const productWishlists = await db.collection('products').updateOne({ productId }, {
+            $push: {
+                wishlists: _id
+            }
+        })
+        const userWishlists = await db.collection('users').updateOne({ _id }, {
+            $push: {
+                wishlists: productId,
+            }
+        })
+        if(productWishlists.modifiedCount === 1 && userWishlists.modifiedCount === 1){
+            res.status(201).send(true)
+        } else {
+            res.status(500).send({message: 'Cannot add to wishlists'})
+        }
+    } catch (err) {
+        console.log(err)
+        res.status(500).send({message: 'This service not available', err})
+    } finally {
+        // await client.close()
+    }
+}
+
+exports.removeWishlist = async (req, res) => {
+    const client = new MongoClient(process.env.MONGODB_URI)
+    try{
+        await client.connect()
+        const db = client.db(process.env.DB_NAME)
+        const productId = parseInt(req.query.productId)
+        const _id = new ObjectId(req.user_id)
+        const productWishlists = await db.collection('products').updateOne({ productId }, {
+            $pull: {
+                wishlists: _id
+            }
+        })
+        const userWishlists = await db.collection('users').updateOne({ _id }, {
+            $pull: {
+                wishlists: productId,
+            }
+        })
+        if(productWishlists.modifiedCount > 0 && userWishlists.modifiedCount > 0){
+            res.status(201).send(false)
+        } else {
+            res.status(500).send({message: 'Cannot remove from wishlists'})
+        }
+    } catch (err) {
+        console.log(err)
+        res.status(500).send({message: 'This service not available', err})
+    } finally {
+        // await client.close()
+    }
+}
 
 exports.review = async (req, res) => {
     const client = new MongoClient(process.env.MONGODB_URI)
@@ -346,26 +474,35 @@ exports.review = async (req, res) => {
             score
         })
         res.status(201).send({message: 'review success'})
+
         const product = await db.collection('products').findOne({productId}, {
+            projection: {
+                _id: 0,
+                seriesId: 1,
+                score: 1
+            }
+        })
+        const series = await db.collection('series').findOne({seriesId: product.seriesId}, {
             projection: {
                 _id: 0,
                 score: 1
             }
         })
-        const avg = Math.round(((product.score.avg * product.score.count) + score) / (product.score.count +1) *100)/100
+        const productAvg = Math.round(((product.score.avg * product.score.count) + score) / (product.score.count +1) *100)/100
+        const seriesAvg = Math.round(((series.score.avg * series.score.count) + score) / (series.score.count +1) *100)/100
         await db.collection('products').updateOne({productId}, {
-            $set : {
-                'score.avg' : avg
-            },
-            $inc: {
-                'score.count': 1
-            }
+            $set : { 'score.avg' : productAvg },
+            $inc: { 'score.count': 1 }
+        })
+        await db.collection('series').updateOne({seriesId: product.seriesId}, {
+            $set : { 'score.avg' : seriesAvg },
+            $inc: { 'score.count': 1 }
         })
     } catch (err) {
         console.log(err)
         res.status(500).send({message: 'This service not available', err})
     } finally {
-        await client.close()
+        // await client.close()
     }
 }
 
@@ -401,7 +538,7 @@ exports.getReview = async (req, res) => {
         console.log(err)
         res.status(500).send({message: 'This service not available', err})
     } finally {
-        await client.close()
+        // await client.close()
     }
 }
 

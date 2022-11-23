@@ -17,10 +17,10 @@ exports.getExchangeRate = async (req, res) => {
                 data: 1
             }
         })
-        // Update exchange rate every 20 min
-        // API limit 250 request for month
+        // Update exchange rate every 3 hour
+        // API limit 250 request per month
         if(cursor.data[0].expire < Date.now()){
-            axios.get("https://api.apilayer.com/exchangerates_data/convert?to=THB&from=USD&amount=1", { headers: {"apikey": process.env.FOREX_API_KEY}})
+            await axios.get("https://api.apilayer.com/exchangerates_data/convert?to=THB&from=USD&amount=1", { headers: {"apikey": process.env.FOREX_API_KEY}})
             .then(async result => {
                 const data = Date.now()
                 const newRate = result.data.result
@@ -30,24 +30,24 @@ exports.getExchangeRate = async (req, res) => {
                             symbol,
                             rate: newRate,
                             lastUpdate: data,
-                            expire: data + 20*60*1000,
+                            expire: data + 3*60*60*1000,
                         }
                     }
                 })
-                res.send({rate: newRate, lastUpdate: Date.now()})
+                res.send({rate: newRate, lastUpdate: data, expire: data + 3*60*60*1000})
             })
             .catch(error => {
                 console.log( error)
                 res.status(503).send({message: 'This Service not available'})
             })
         } else {
-            res.send({rate: cursor.data[0].rate, lastUpdate: cursor.data[0].lastUpdate})
+            res.send({rate: cursor.data[0].rate, lastUpdate: cursor.data[0].lastUpdate, expire: cursor.data[0].expire})
         }
     } catch (err) {
         console.log(err)
         res.status(500).send({message: 'This service not available', err})
     } finally {
-        await client.close()
+        // await client.close()
     }
     
 }
