@@ -8,11 +8,11 @@ const controller = require('../controllers/adminRoute.controller')
 
 router.post('/addProduct', [jwt_middleware.isAdmin, middleware.checkProduct], controller.addProduct )
 
-router.patch('/product', [jwt_middleware.isAdmin, middleware.checkProductName], controller.changeProductData)
+router.patch('/product', [jwt_middleware.isAdmin, middleware.checkProductNameChange], controller.changeProductData)
 
 router.post('/addSeries', [jwt_middleware.isAdmin, middleware.checkSeries], controller.addSeries )
 
-router.patch('/series', [jwt_middleware.isAdmin, middleware.checkSeries], controller.changeSeriesData)
+router.patch('/series', [jwt_middleware.isAdmin, middleware.checkSeriesNameChange], controller.changeSeriesData)
 
 router.get('/reCalculateCos', jwt_middleware.isAdmin, controller.reCalculateCos)
 

@@ -1,8 +1,6 @@
 
 const mongoUtil = require('../config/database')
-mongoUtil.connectToServer(function(err, client){
-    if (err) console.log(err);
-})
+
 const { MongoClient } = require('mongodb')
 const ObjectId = require('mongodb').ObjectId
 const Moralis = require('moralis').default
@@ -194,12 +192,14 @@ exports.addSeries = async (req, res) => {
 
 }
 
+const S3 = require('@aws-sdk/client-s3')
+
 exports.changeSeriesData = async (req, res) => {
     const client = new MongoClient(process.env.MONGODB_URI)
     try{
         await client.connect()
         const db = client.db(process.env.DB_NAME)
-        const { seriesId, title, author, illustrator, publisher, genres, keywords, img, description} = req.body
+        const { seriesId, title, author, illustrator, publisher, genres, keywords, img, description, imgChange} = req.body
         const date = Date.now()
         await db.collection('series').updateOne({seriesId},{
             $set: {
@@ -214,6 +214,9 @@ exports.changeSeriesData = async (req, res) => {
                 lastModify: date,
             } 
         })
+        if(imgChange.isImageChange){
+            console.log(imgChange.previousImage)
+        }
         res.status(201).send({
             message: "update series success",
         })

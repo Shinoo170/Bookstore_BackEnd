@@ -44,7 +44,31 @@ exports.checkProduct = async (req, res, next) => {
     }
 }
 
-exports.checkProductName = async (req, res, next) => {
+exports.checkSeriesNameChange = async (req, res, next) => {
+    if(req.body.isTitleChange){
+        const client = new MongoClient(process.env.MONGODB_URI)
+        try{
+            await client.connect()
+            const db = client.db(process.env.DB_NAME)
+            let data = await db.collection("series").findOne({
+                title: req.body.title,
+            })
+            if (data) {
+                return res.status(400).send({ message: "ชื่อซีรีย์ซ้ำ", })
+            }
+            next()
+        } catch (err) {
+            console.log(err)
+            res.status(500).send({message: 'This service not available', err})
+        } finally {
+            await client.close()
+        }
+    } else {
+        next()
+    }
+}
+
+exports.checkProductNameChange = async (req, res, next) => {
     if(req.body.isUrlChange){
         const client = new MongoClient(process.env.MONGODB_URI)
         try{
