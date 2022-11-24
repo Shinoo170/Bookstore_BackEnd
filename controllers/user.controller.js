@@ -5,10 +5,179 @@ const ObjectId = require('mongodb').ObjectId
 const Moralis = require('moralis').default
 const { EvmChain } = require('@moralisweb3/evm-utils')
 const ethers = require('ethers')
-// const omise = require('omise')({
-//     'publicKey': process.env.OMISE_PUBLIC_KEY,
-//     'secretKey': process.env.OMISE_SECRET_KEY
-// })
+const request = require('request')
+
+// User data
+exports.getUserData = async (req, res) => {
+    const client = new MongoClient(process.env.MONGODB_URI)
+    try{
+        await client.connect()
+        const db = client.db(process.env.DB_NAME)
+        const _id = new ObjectId(req.user_id)
+        const userData = await db.collection('users').findOne({ _id },{
+            projection: {
+                _id: 0,
+                email: 1,
+                userData: 1,
+            }
+        })
+        
+        res.status(200).send(userData)
+    } catch (err) {
+        console.log(err)
+        res.status(500).send({message: 'This service not available', err})
+    } finally {
+        await client.close()
+    }
+}
+
+exports.updateUserData = async (req, res) => {
+    const client = new MongoClient(process.env.MONGODB_URI)
+    try{
+        await client.connect()
+        const db = client.db(process.env.DB_NAME)
+        const _id = new ObjectId(req.user_id)
+        var newValues = {
+            $set: {
+                "userData.displayName": req.body.u, 
+                "userData.tel": req.body.t, 
+                "email": req.body.e, 
+                "userData.firstName": req.body.firstName, 
+                "userData.lastName": req.body.lastName 
+            }
+        }
+        const result = await db.collection('users').updateOne({ _id }, newValues)
+        res.status(200).send("update users success")
+    } catch (err) {
+        console.log(err)
+        res.status(500).send({message: 'This service not available', err})
+    } finally {
+        await client.close()
+    }
+}
+
+exports.updateUserProfile = async (req, res) => {
+    const client = new MongoClient(process.env.MONGODB_URI)
+    try{
+        await client.connect()
+        const db = client.db(process.env.DB_NAME)
+        const _id = new ObjectId(req.user_id)
+        var newValues = { $set: {"userData.img":req.body.imgURL}};
+        await db.collection('users').updateOne({ _id }, newValues)
+        res.status(200).send({message: 'update success'})
+    } catch (err) {
+        console.log(err)
+        res.status(500).send({message: 'This service not available', err})
+    } finally {
+        await client.close()
+    }
+}
+
+exports.createUserDataAddress = async (req, res) => {
+    const client = new MongoClient(process.env.MONGODB_URI)
+    try{
+        await client.connect()
+        const db = client.db(process.env.DB_NAME)
+        const _id = new ObjectId(req.user_id)
+        var newAddress = {
+            $push: {
+                'userData.address': { 
+                    Name: req.body.a, 
+                    address: req.body.l, 
+                    country: req.body.coun, 
+                    district: req.body.dist, 
+                    province: req.body.prov, 
+                    subdistrict: req.body.subd, 
+                    zipCode: req.body.zipC 
+                }
+            }
+        }
+        await db.collection('users').updateOne({ _id }, newAddress)
+        res.status(200).send("delete success")
+    } catch (err) {
+        console.log(err)
+        res.status(500).send({message: 'This service not available', err})
+    } finally {
+        await client.close()
+    }
+}
+
+exports.updateUserAddress = async (req, res) => {
+    const client = new MongoClient(process.env.MONGODB_URI)
+    try{
+        await client.connect()
+        const db = client.db(process.env.DB_NAME)
+        const _id = new ObjectId(req.user_id)
+        var target = "userData.address." + req.body.index + ".Name"
+        var target2 = "userData.address." + req.body.index + ".address"
+        var target3 = "userData.address." + req.body.index + ".country"
+        var target4 = "userData.address." + req.body.index + ".district"
+        var target5 = "userData.address." + req.body.index + ".province"
+        var target6 = "userData.address." + req.body.index + ".subdistrict"
+        var target7 = "userData.address." + req.body.index + ".zipCode"
+        var newValues = { 
+            $set: {
+                [target]: req.body.a,
+                [target2]: req.body.l,
+                [target3]: req.body.coun,
+                [target4]: req.body.dist,
+                [target5]: req.body.prov,
+                [target6]: req.body.subd,
+                [target7]: req.body.zipC 
+            }
+        }
+        await db.collection('users').updateOne({ _id }, newValues)
+        res.status(200).send("update users success")
+    } catch (err) {
+        console.log(err)
+        res.status(500).send({message: 'This service not available', err})
+    } finally {
+        await client.close()
+    }
+}
+
+exports.deleteUserDataAddress = async (req, res) => {
+    const client = new MongoClient(process.env.MONGODB_URI)
+    try{
+        await client.connect()
+        const db = client.db(process.env.DB_NAME)
+        const _id = new ObjectId(req.user_id)
+        var target = "userData.address." + req.body.index
+        var newValues = { $unset: {[target]: '' }}
+        await db.collection("users").updateOne({ _id }, newValues)
+        var newValues2 = { $pull: {'userData.address': null}}
+        await db.collection("users").updateOne({ _id }, newValues2)
+        res.status(200).send("delete success")
+    } catch (err) {
+        console.log(err)
+        res.status(500).send({message: 'This service not available', err})
+    } finally {
+        await client.close()
+    }
+}
+
+exports.getUserAddress = async (req, res) => {
+    const client = new MongoClient(process.env.MONGODB_URI)
+    try{
+        await client.connect()
+        const db = client.db(process.env.DB_NAME)
+        const _id = new ObjectId(req.user_id)
+        var address = await db.collection('users').findOne({ _id },{
+            projection: {
+                _id: 0,
+                email: 1,
+                userData: 1,
+            }
+        })
+        address.userData.email = address.email
+        res.status(200).send(address.userData)
+    } catch (err) {
+        console.log(err)
+        res.status(500).send({message: 'This service not available', err})
+    } finally {
+        await client.close()
+    }
+}
 
 // Cart
 exports.getCart = async (req, res) => {
@@ -113,33 +282,12 @@ exports.deleteItem = async (req, res) => {
     }
 }
 
-// Omise
-// const addNewCardOmise = async (id , token) => {
-//     omise.customers.update(
-//         id,
-//         {'card': token},
-//         function(error, customer) {
-//             return customer.cards[customer.cards.length - 1]
-//         }
-//     )
-// }
-
-// const chargeOmise = async (amount, token) => {
-//     const charge = await omise.charges.create({
-//         amount: amount*100,
-//         currency: 'thb',
-//         card: token
-//     })
-//     return charge
-// }
-
 exports.placeOrder = async (req, res) => {
-    if(req.body.method !== 'metamask') return res.status(400).send({message : "Please use another service"})
     const client = new MongoClient(process.env.MONGODB_URI)
     try{
         await client.connect()
         const db = client.db(process.env.DB_NAME)
-        const { amount, method, exchange_rate, shippingFee, cart } = req.body
+        const { amount, method, exchange_rate, shippingFee, cart, selectAddress} = req.body
         const date = Date.now()
         const user_id = req.user_id
         const _id = new ObjectId(user_id)
@@ -189,9 +337,9 @@ exports.placeOrder = async (req, res) => {
             method,
             cart: finalOrder,
             created_at: date,
-            date: new Date(date).toLocaleString('en-US', { hour12: false}),
+            date: new Date(date).toLocaleString('no-NO', { hour12: false}),
             paymentDetails: {},
-            address: {},
+            address: selectAddress,
             status: 'ordered',
         }
         if(( refund > 0 ) && (method === 'metamask') ){
@@ -217,7 +365,87 @@ exports.placeOrder = async (req, res) => {
             status: 'successful',
             orderId,
         })
-        if( method === 'metamask') {
+        if( method === 'credit_card'){
+            var headers = {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            }
+            var dataString = 'amount=' + amount*100 + '&currency=thb&card=' + req.body.token
+            var options = {
+                url: 'https://api.omise.co/charges',
+                method: 'POST',
+                headers: headers,
+                body: dataString,
+                auth: {
+                    'user': process.env.OMISE_SECRET_KEY,
+                    'pass': ''
+                }
+            }
+            async function callback(error, response, body) {
+                if (!error && response.statusCode == 200) {
+                    const omiseCharge = JSON.parse(body)
+                    if(omiseCharge.status !== 'successful') {
+                        // ! Charge error
+                        finalOrder.forEach(async element => {
+                            await db.collection('products').updateOne({productId: element.productId}, {
+                                $inc : { amount: element.amount ,sold: -element.amount}
+                            })
+                        })
+                        await db.collection('orders').updateOne({orderId}, {
+                            $set: {
+                                status: 'cancel',
+                                cancel_message: 'Payment refuse',
+                                failure_code: omiseCharge.failure_code,
+                                failure_message: omiseCharge.failure_message,
+                            }
+                        })
+                        return
+                    } else {
+                        // * Charge success
+                        const paidDate = Date.now()
+                        await db.collection('orders').updateOne({orderId},{
+                            $set : {
+                                paymentDetails: {
+                                    bank: omiseCharge.card.bank,
+                                    brand: omiseCharge.card.brand,
+                                    total: omiseCharge.amount/100,
+                                    net: omiseCharge.net/100,
+                                    fee: omiseCharge.fee/100,
+                                    fee_vat: omiseCharge.fee_vat/100,
+                                    omiseCardId: omiseCharge.card.id,
+                                    omiseChargeId: omiseCharge.id,
+                                    omiseTransactionId: omiseCharge.transaction,
+                                    created_at: paidDate,
+                                    date: new Date(date).toLocaleString('no-NO', { hour12: false}),
+                                },
+                                status: 'paid',
+                            }
+                        })
+                        return
+                    }
+                } else {
+                    console.log(error)
+                    console.log(response.statusCode)
+                    finalOrder.forEach(async element => {
+                        await db.collection('products').updateOne({productId: element.productId}, {
+                            $inc : { amount: element.amount, sold: -element.amount }
+                        })
+                    })
+                    await db.collection('orders').updateOne({orderId}, {
+                        $set: {
+                            status: 'cancel',
+                            cancel_message: 'Payment refuse',
+                            failure_code: 'payment_error',
+                            failure_message: 'payment error',
+                        }
+                    })
+                    return
+                }
+                
+            }
+            request(options, callback)
+            
+        }
+        else if( method === 'metamask') {
             const { hash } = req.body
             const chain = EvmChain.BSC_TESTNET
             var refundHash
@@ -243,7 +471,7 @@ exports.placeOrder = async (req, res) => {
                         net: totalPriceSummary,
                         hash,
                         created_at: paidDate,
-                        date: new Date(paidDate).toLocaleString('en-US', { hour12: false}),
+                        date: new Date(paidDate).toLocaleString('no-NO', { hour12: false}),
                     },
                     status: 'paid',
                 }
@@ -293,72 +521,9 @@ exports.placeOrder = async (req, res) => {
         console.log(err)
         res.status(500).send({message: 'This service not available', err})
     } finally {
-        // await client.close()
+        await client.close()
     }
 }
-
-// if(method === 'credit_card'){
-//     var charge
-//     try {
-//         // Charge
-//         const token = req.body.token
-//         charge = await chargeOmise(totalPriceSummary, token)
-//     } catch (error) {
-//         finalOrder.forEach(async element => {
-//             await db.collection('products').updateOne({productId: element.productId}, {
-//                 $inc : { amount: element.amount, sold: -element.amount }
-//             })
-//         })
-//         db.collection('orders').updateOne({orderId}, {
-//             $set: {
-//                 status: 'cancel',
-//                 cancel_message: 'Payment refuse',
-//                 failure_code: 'payment_error',
-//                 failure_message: 'payment error',
-//             }
-//         })
-//         return
-//     }
-//     if(charge.status !== 'successful'){
-//         // ! Charge error
-//         finalOrder.forEach(async element => {
-//             await db.collection('products').updateOne({productId: element.productId}, {
-//                 $inc : { amount: element.amount ,sold: -element.amount}
-//             })
-//         })
-//         db.collection('orders').updateOne({orderId}, {
-//             $set: {
-//                 status: 'cancel',
-//                 cancel_message: 'Payment refuse',
-//                 failure_code: charge.failure_code,
-//                 failure_message: charge.failure_message,
-//             }
-//         })
-//         return
-//     } else {
-//         // * Charge success
-//         const paidDate = Date.now()
-//         await db.collection('orders').updateOne({orderId},{
-//             $set : {
-//                 paymentDetails: {
-//                     bank: charge.card.bank,
-//                     brand: charge.card.brand,
-//                     total: charge.amount/100,
-//                     net: charge.net/100,
-//                     fee: charge.fee/100,
-//                     fee_vat: charge.fee_vat/100,
-//                     omiseCardId: charge.card.id,
-//                     omiseChargeId: charge.id,
-//                     omiseTransactionId: charge.transaction,
-//                     created_at: paidDate,
-//                     date: new Date(paidDate).toISOString(),
-//                 },
-//                 status: 'paid',
-//             }
-//         })
-//         return
-//     }
-// }
 
 exports.getSubscribes = async (req, res) => {
     const client = new MongoClient(process.env.MONGODB_URI)
@@ -389,7 +554,7 @@ exports.getSubscribes = async (req, res) => {
         console.log(err)
         res.status(500).send({message: 'This service not available', err})
     } finally {
-        // await client.close()
+        await client.close()
     }
 }
 

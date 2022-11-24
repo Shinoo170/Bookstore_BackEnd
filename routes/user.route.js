@@ -4,6 +4,20 @@ const authJwt = require('../middleware/authJwt')
 
 const controller  = require('../controllers/user.controller')
 
+router.get('/', authJwt.verifyToken, controller.getUserData)
+
+router.patch('/updateUserData', authJwt.verifyToken, controller.updateUserData)
+
+router.patch('/updateUserProfile', authJwt.verifyToken, controller.updateUserProfile)
+
+router.post('/createUserDataAddress', authJwt.verifyToken, controller.createUserDataAddress)
+
+router.patch('/updateUserAddress', authJwt.verifyToken, controller.updateUserAddress)
+
+router.patch('/deleteUserDataAddress', authJwt.verifyToken, controller.deleteUserDataAddress)
+
+router.get('/getUserAddress', authJwt.verifyToken, controller.getUserAddress)
+
 // Get cart
 router.get('/cart', authJwt.verifyToken, controller.getCart)
 
@@ -18,36 +32,8 @@ router.post('/placeOrder', authJwt.verifyToken, controller.placeOrder)
 
 // subscribe and wishlists
 router.get('/getSubscribes', authJwt.verifyToken, controller.getSubscribes)
+
 router.get('/getWishlists', authJwt.verifyToken, controller.getWishlists)
 
-const request = require('request')
-router.post('/omise', async (req, res) => {
-    var headers = {
-        'Content-Type': 'application/x-www-form-urlencoded'
-    };
-    
-    var dataString = 'amount=10000&currency=thb&card=' + req.body.token;
-    
-    var options = {
-        url: 'https://api.omise.co/charges',
-        method: 'POST',
-        headers: headers,
-        body: dataString,
-        auth: {
-            'user': 'skey_test_5tphsxg5lj1j0k7uojy',
-            'pass': ''
-        }
-    };
-    function callback(error, response, body) {
-        if (!error && response.statusCode == 200) {
-            console.log(body);
-        } else if(!error) {
-            console.log(body);
-        }
-    }
-    
-    request(options, callback);
-    res.send('ok')
-})
 
 module.exports = router

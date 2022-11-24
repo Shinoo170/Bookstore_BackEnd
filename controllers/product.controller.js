@@ -542,6 +542,22 @@ exports.getReview = async (req, res) => {
     }
 }
 
+exports.deleteReview = async (req, res) => {
+    const client = new MongoClient(process.env.MONGODB_URI)
+    try{
+        await client.connect()
+        const db = client.db(process.env.DB_NAME)
+        const _id = new ObjectId(req.query.reviewId)
+        await db.collection('review').deleteOne({ _id })
+        res.status(200).send('success')
+    } catch (err) {
+        console.log(err)
+        res.status(500).send({message: 'This service not available', err})
+    } finally {
+        // await client.close()
+    }
+}
+
 
 // const client = new MongoClient(process.env.MONGODB_URI)
 // try{

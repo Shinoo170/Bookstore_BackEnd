@@ -29,11 +29,14 @@ router.get('/mostSoldProduct', controller.getMostSoldProduct)
 
 router.get('/genres', controller.getAllGenres)
 
+// Get review
+router.get('/review', controller.getReview)
+
 // User add new review
 router.post('/review', authJwt.verifyToken, controller.review)
 
-// Get review
-router.get('/review', controller.getReview)
+// Delete review
+router.delete('/review', authJwt.verifyToken, controller.deleteReview)
 
 // Subscribe 
 router.get('/subscribe', authJwt.verifyToken , controller.isUserSubscribe)
