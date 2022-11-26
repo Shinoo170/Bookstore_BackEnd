@@ -5,7 +5,8 @@ const { MongoClient } = require('mongodb')
 const ObjectId = require('mongodb').ObjectId
 const Moralis = require('moralis').default
 const { EvmChain } = require('@moralisweb3/evm-utils')
-  
+
+
 exports.addProduct = async (req, res) => {
     const client = new MongoClient(process.env.MONGODB_URI)
     try{
@@ -39,6 +40,7 @@ exports.addProduct = async (req, res) => {
             lastModify: date,
             sold: 0,
             population: 0,
+            wishlists: [],
         }
         const newProduct = await db.collection('products').insertOne(newData)
         const target = "products.total" + category.charAt(0).toUpperCase() + category.slice(1)
@@ -82,21 +84,47 @@ exports.changeProductData = async (req, res) => {
     try{
         await client.connect()
         const db = client.db(process.env.DB_NAME)
-        const { seriesId, url, bookNum, category, thai_category, status, price, amount, description, isImageChange, isCategoryChange, isUrlChange } = req.body
+        const { seriesId, url,category, thai_category, status, price, amount, description, isImageChange, isCategoryChange, isUrlChange } = req.body
         const date = Date.now()
         const updateData = {
-            bookNum,
             status,
             price,
             amount,
             description,
             lastModify: date
         }
+        var targetUrl = url
         if(isUrlChange){
+            updateData.title = req.body.title
+            updateData.bookNum = req.body.bookNum
             updateData.url = req.body.newUrl
+            targetUrl = req.body.newUrl
         }
         if(isImageChange) {
+            // Delete old image
             updateData.img = req.body.listImgURL
+            const listImg = await db.collection('products').findOne({ url }, {
+                projection: {
+                    _id: 0,
+                    img: 1,
+                }
+            })
+            const targetImg = listImg.img
+            const aws = require('aws-sdk')
+            aws.config.update({
+                secretAccessKey: process.env.AWS_S3_SECRET_ACCESS_KEY,
+                accessKeyId: process.env.AWS_S3_ACCESS_KEY_ID,
+                region: process.env.AWS_S3_REGION,
+            })
+            const s3 = new aws.S3()
+            targetImg.forEach(async filePath => {
+                const removePath = process.env.AWS_S3_URL + '/'
+                const key = filePath.replaceAll(removePath, '')
+                await s3.deleteObject({ 
+                    Bucket: process.env.AWS_S3_BUCKET_NAME,
+                    Key: key 
+                }).promise()
+            })
         }
         if(isCategoryChange){
             updateData.category = category
@@ -105,8 +133,6 @@ exports.changeProductData = async (req, res) => {
         await db.collection('products').updateOne({url},{
             $set: updateData
         })
-
-        const targetUrl = req.body.newUrl || url
         if(isCategoryChange){
             const _id = new ObjectId(req.body.id)
             var previousTotalTarget = 'products.total' + req.body.previousCategory.charAt(0).toUpperCase() + req.body.previousCategory.slice(1)
@@ -125,15 +151,72 @@ exports.changeProductData = async (req, res) => {
                     [previousTargetId]: _id,
                 },
                 $set: {
-                    lastModify: date,
+                    lastModify: date
                 }
             })
         }
 
+        await db.collection('products').updateOne({ url }, {
+            $set: updateData
+        })
         res.status(201).send({
             message: "update product success",
             url: targetUrl,
         })
+    } catch (err) {
+        console.log(err)
+        res.status(500).send({message: 'This service not available', err})
+    } finally {
+        // await client.close()
+    }
+}
+
+exports.deleteProduct = async (req, res) => {
+    const client = new MongoClient(process.env.MONGODB_URI)
+    try{
+        await client.connect()
+        const db = client.db(process.env.DB_NAME)
+        const listImg = await db.collection('products').findOne({ productId: parseInt(req.query.productId) }, {
+            projection: {
+                _id: 0,
+                img: 1,
+            }
+        })
+        const targetImg = listImg.img
+        await db.collection('products').deleteOne({ productId: parseInt(req.query.productId) })
+        const aws = require('aws-sdk')
+        aws.config.update({
+            secretAccessKey: process.env.AWS_S3_SECRET_ACCESS_KEY,
+            accessKeyId: process.env.AWS_S3_ACCESS_KEY_ID,
+            region: process.env.AWS_S3_REGION,
+        })
+        const s3 = new aws.S3()
+        targetImg.forEach(async filePath => {
+            const removePath = process.env.AWS_S3_URL + '/'
+            const key = filePath.replaceAll(removePath, '')
+            await s3.deleteObject({ 
+                Bucket: process.env.AWS_S3_BUCKET_NAME,
+                Key: key 
+            }).promise()
+        })
+        const date = Date.now()
+        const _id = new ObjectId(req.query._id)
+        var TotalTarget = 'products.total' + req.query.category.charAt(0).toUpperCase() + req.query.category.slice(1)
+        var TargetId = 'products.' + req.query.category + 'Id'
+        await db.collection('series').updateOne({seriesId: parseInt(req.query.seriesId) }, {
+            $inc: {
+                'products.totalProducts': -1,
+                [TotalTarget]: -1,
+            },
+            $pull : {
+                [TargetId]: _id,
+            },
+            $set: {
+                lastModify: date
+            }
+        })
+
+        res.status(200).send('success')
     } catch (err) {
         console.log(err)
         res.status(500).send({message: 'This service not available', err})
@@ -176,8 +259,9 @@ exports.addSeries = async (req, res) => {
                 lastModify: { manga: date, novel: date, other: date },
                 mangaId: [],
                 novelId: [],
-                otherId: []
-            }
+                otherId: [],
+            },
+            subscribe: [],
         })
         res.status(201).send({
             message: "Add series success",
@@ -191,8 +275,6 @@ exports.addSeries = async (req, res) => {
     }
 
 }
-
-const S3 = require('@aws-sdk/client-s3')
 
 exports.changeSeriesData = async (req, res) => {
     const client = new MongoClient(process.env.MONGODB_URI)
@@ -230,7 +312,9 @@ exports.changeSeriesData = async (req, res) => {
 
 exports.reCalculateCos = async (req, res) => {
     try {
-        var db = mongoUtil.getDb()
+        const client = new MongoClient(process.env.MONGODB_URI)
+        await client.connect()
+        const db = client.db(process.env.DB_NAME)
         const counter = await db.collection('counters').findOne({_id: 'seriesId'})
         const productCounter = counter.seq - 1
         db.collection('series').find({}, {

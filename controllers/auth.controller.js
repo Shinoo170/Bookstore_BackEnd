@@ -78,6 +78,7 @@ exports.signIn = async (req, res) => {
                 message: "login success",
                 token,
                 userId: userData._id,
+                img: userData.userData.img,
                 name: userData.userData.displayName,
             })
         } else {

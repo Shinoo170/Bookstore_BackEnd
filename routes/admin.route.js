@@ -10,11 +10,13 @@ router.post('/addProduct', [jwt_middleware.isAdmin, middleware.checkProduct], co
 
 router.patch('/product', [jwt_middleware.isAdmin, middleware.checkProductNameChange], controller.changeProductData)
 
+router.delete('/product', jwt_middleware.isAdmin, controller.deleteProduct)
+
 router.post('/addSeries', [jwt_middleware.isAdmin, middleware.checkSeries], controller.addSeries )
 
 router.patch('/series', [jwt_middleware.isAdmin, middleware.checkSeriesNameChange], controller.changeSeriesData)
 
-router.get('/reCalculateCos', jwt_middleware.isAdmin, controller.reCalculateCos)
+router.get('/reCalculateCos', controller.reCalculateCos)
 
 router.get('/getOrders', jwt_middleware.isAdmin, controller.getOrders)
 

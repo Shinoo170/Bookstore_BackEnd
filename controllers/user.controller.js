@@ -62,8 +62,23 @@ exports.updateUserProfile = async (req, res) => {
         await client.connect()
         const db = client.db(process.env.DB_NAME)
         const _id = new ObjectId(req.user_id)
-        var newValues = { $set: {"userData.img":req.body.imgURL}};
+        var newValues = { $set: {"userData.img":req.body.imgURL}}
         await db.collection('users').updateOne({ _id }, newValues)
+
+        const aws = require('aws-sdk')
+        aws.config.update({
+            secretAccessKey: process.env.AWS_S3_SECRET_ACCESS_KEY,
+            accessKeyId: process.env.AWS_S3_ACCESS_KEY_ID,
+            region: process.env.AWS_S3_REGION,
+        })
+        const s3 = new aws.S3()
+        const removePath = process.env.AWS_S3_URL + '/'
+        const key = req.body.previousImgUrl.replaceAll(removePath, '')
+        await s3.deleteObject({ 
+            Bucket: process.env.AWS_S3_BUCKET_NAME,
+            Key: key 
+        }).promise()
+        
         res.status(200).send({message: 'update success'})
     } catch (err) {
         console.log(err)
@@ -440,7 +455,6 @@ exports.placeOrder = async (req, res) => {
                     })
                     return
                 }
-                
             }
             request(options, callback)
             
@@ -462,7 +476,6 @@ exports.placeOrder = async (req, res) => {
                     setTimeout(resolve, 1000)
                 })
             }
-            // ! address
             const paidDate = Date.now()
             var orderUpdate = {
                 $set: {
@@ -521,7 +534,35 @@ exports.placeOrder = async (req, res) => {
         console.log(err)
         res.status(500).send({message: 'This service not available', err})
     } finally {
-        await client.close()
+        // await client.close()
+    }
+}
+
+exports.getOrder = async (req, res) => {
+    const client = new MongoClient(process.env.MONGODB_URI)
+    try{
+        await client.connect()
+        const db = client.db(process.env.DB_NAME)
+
+        var status_sort = req.query.sort || 'all'
+        var pages = req.query.pages || 1
+        var pageLimit = 10
+        var query = {}
+        // if status = 'all' query condition = {}
+        if(status_sort !== 'all'){
+            query = { status: status_sort }
+        }
+        var sort = {'orderId': -1}
+        if(status_sort === 'paid'){
+            sort = { 'paymentDetails.created_at': 1 }
+        }
+        const order = await db.collection('orders').find(query).sort(sort).limit(pageLimit).skip((pages-1) * pageLimit).toArray()
+        res.status(200).send(order)
+    } catch (err) {
+        console.log(err)
+        res.status(500).send({message: 'This service not available', err})
+    } finally {
+        // await client.close()
     }
 }
 
