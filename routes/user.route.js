@@ -30,6 +30,10 @@ router.patch('/cart', authJwt.verifyToken, controller.deleteItem)
 // Place order, create omise customer and charges
 router.post('/placeOrder', authJwt.verifyToken, controller.placeOrder)
 
+router.get('/getOrder', authJwt.verifyToken, controller.getOrder)
+
+router.get('/getOrderDetails', authJwt.verifyToken, controller.getOrderDetails)
+
 // subscribe and wishlists
 router.get('/getSubscribes', authJwt.verifyToken, controller.getSubscribes)
 

@@ -65,19 +65,21 @@ exports.updateUserProfile = async (req, res) => {
         var newValues = { $set: {"userData.img":req.body.imgURL}}
         await db.collection('users').updateOne({ _id }, newValues)
 
-        const aws = require('aws-sdk')
-        aws.config.update({
-            secretAccessKey: process.env.AWS_S3_SECRET_ACCESS_KEY,
-            accessKeyId: process.env.AWS_S3_ACCESS_KEY_ID,
-            region: process.env.AWS_S3_REGION,
-        })
-        const s3 = new aws.S3()
-        const removePath = process.env.AWS_S3_URL + '/'
-        const key = req.body.previousImgUrl.replaceAll(removePath, '')
-        await s3.deleteObject({ 
-            Bucket: process.env.AWS_S3_BUCKET_NAME,
-            Key: key 
-        }).promise()
+        if(req.body.previousImgUrl !== null){
+            const aws = require('aws-sdk')
+            aws.config.update({
+                secretAccessKey: process.env.AWS_S3_SECRET_ACCESS_KEY,
+                accessKeyId: process.env.AWS_S3_ACCESS_KEY_ID,
+                region: process.env.AWS_S3_REGION,
+            })
+            const s3 = new aws.S3()
+            const removePath = process.env.AWS_S3_URL + '/'
+            const key = req.body.previousImgUrl.replaceAll(removePath, '')
+            await s3.deleteObject({ 
+                Bucket: process.env.AWS_S3_BUCKET_NAME,
+                Key: key 
+            }).promise()
+        }
         
         res.status(200).send({message: 'update success'})
     } catch (err) {
@@ -399,7 +401,7 @@ exports.placeOrder = async (req, res) => {
                 if (!error && response.statusCode == 200) {
                     const omiseCharge = JSON.parse(body)
                     if(omiseCharge.status !== 'successful') {
-                        // ! Charge error
+                        // ! if Charge error
                         finalOrder.forEach(async element => {
                             await db.collection('products').updateOne({productId: element.productId}, {
                                 $inc : { amount: element.amount ,sold: -element.amount}
@@ -415,7 +417,7 @@ exports.placeOrder = async (req, res) => {
                         })
                         return
                     } else {
-                        // * Charge success
+                        // * if Charge success
                         const paidDate = Date.now()
                         await db.collection('orders').updateOne({orderId},{
                             $set : {
@@ -545,19 +547,65 @@ exports.getOrder = async (req, res) => {
         const db = client.db(process.env.DB_NAME)
 
         var status_sort = req.query.sort || 'all'
-        var pages = req.query.pages || 1
+        var pages = parseInt(req.query.pages) || 1
         var pageLimit = 10
-        var query = {}
-        // if status = 'all' query condition = {}
+        const _id = new ObjectId(req.user_id)
+        const orderId = await db.collection('users').findOne({_id}, { projection: { _id: 0, order: 1}})
+        
+        var query = { orderId: { $in: orderId.order } }
         if(status_sort !== 'all'){
-            query = { status: status_sort }
+            query.status = status_sort
         }
-        var sort = {'orderId': -1}
+        var sort = { 'orderId': -1 }
         if(status_sort === 'paid'){
             sort = { 'paymentDetails.created_at': 1 }
         }
         const order = await db.collection('orders').find(query).sort(sort).limit(pageLimit).skip((pages-1) * pageLimit).toArray()
         res.status(200).send(order)
+    } catch (err) {
+        console.log(err)
+        res.status(500).send({message: 'This service not available', err})
+    } finally {
+        // await client.close()
+    }
+}
+
+exports.getOrderDetails = async (req, res) => {
+    const client = new MongoClient(process.env.MONGODB_URI)
+    try{
+        await client.connect()
+        const db = client.db(process.env.DB_NAME)
+        const orderId = req.query.orderId
+        const order = await db.collection('orders').findOne({ user_id: req.user_id, orderId: parseInt(orderId) })
+        if(order){
+            var productIdList = order.cart.map(element => { return element.productId })
+            var productDetails = await db.collection('products').find({ productId: { $in: productIdList }
+            }).project({
+                _id: 0,
+                seriesId: 1,
+                productId: 1,
+                title: 1,
+                url: 1,
+                bookNum: 1,
+                category: 1,
+                thai_category: 1,
+                price: 1,
+                amount: 1,
+                img: 1,
+            }).toArray()
+
+            order.cart.map((element) => {
+                for(let i=0; i<productDetails.length; i++){
+                    if(element.productId === productDetails[i].productId){
+                        productDetails[i].amount = element.amount
+                        productDetails[i].price = element.price
+                    }
+                }
+            })
+            res.status(200).send({order, productDetails})
+        } else {
+            res.status(404).send({message: 'No order found'})
+        }
     } catch (err) {
         console.log(err)
         res.status(500).send({message: 'This service not available', err})

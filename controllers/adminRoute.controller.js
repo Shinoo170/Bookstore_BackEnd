@@ -68,9 +68,9 @@ exports.addProduct = async (req, res) => {
         })
 
         // Notify to subscriber
-        const subscriber = seriesData.value.subscribe
-        const subscriber_email = await db.collection('users').find({ _id: { $in: subscriber} }).project({ _id:0, email: 1}).toArray()
-        console.log(subscriber_email)
+        // const subscriber = seriesData.value.subscribe
+        // const subscriber_email = await db.collection('users').find({ _id: { $in: subscriber} }).project({ _id:0, email: 1}).toArray()
+        // console.log(subscriber_email)
     } catch (err) {
         console.log(err)
         res.status(500).send({message: 'This service not available', err})
@@ -156,7 +156,7 @@ exports.changeProductData = async (req, res) => {
             })
         }
 
-        await db.collection('products').updateOne({ url }, {
+        await db.collection('products').updateOne({ url: req.body.url }, {
             $set: updateData
         })
         res.status(201).send({
@@ -176,14 +176,52 @@ exports.deleteProduct = async (req, res) => {
     try{
         await client.connect()
         const db = client.db(process.env.DB_NAME)
-        const listImg = await db.collection('products').findOne({ productId: parseInt(req.query.productId) }, {
+
+        await db.collection('products').updateOne({ productId: parseInt(req.query.productId) }, {
+            $set: {
+                status: 'delete'
+            }
+        })
+
+        const date = Date.now()
+        const _id = new ObjectId(req.query._id)
+        var TotalTarget = 'products.total' + req.query.category.charAt(0).toUpperCase() + req.query.category.slice(1)
+        var TargetId = 'products.' + req.query.category + 'Id'
+        await db.collection('series').updateOne({seriesId: parseInt(req.query.seriesId) }, {
+            $inc: {
+                'products.totalProducts': -1,
+                [TotalTarget]: -1,
+            },
+            $pull : {
+                [TargetId]: _id,
+            },
+            $set: {
+                lastModify: date
+            }
+        })
+
+        res.status(200).send('success')
+    } catch (err) {
+        console.log(err)
+        res.status(500).send({message: 'This service not available', err})
+    } finally {
+        // await client.close()
+    }
+}
+
+exports.permanentlyDeleteProduct = async (req, res) => {
+    const client = new MongoClient(process.env.MONGODB_URI)
+    try{
+        await client.connect()
+        const db = client.db(process.env.DB_NAME)
+        const listImg = await db.collection('products').findOneAndDelete({ productId: parseInt(req.query.productId) }, {
             projection: {
                 _id: 0,
                 img: 1,
             }
         })
-        const targetImg = listImg.img
-        await db.collection('products').deleteOne({ productId: parseInt(req.query.productId) })
+        const targetImg = listImg.value.img
+        // await db.collection('products').deleteOne({ productId: parseInt(req.query.productId) })
         const aws = require('aws-sdk')
         aws.config.update({
             secretAccessKey: process.env.AWS_S3_SECRET_ACCESS_KEY,
@@ -281,7 +319,7 @@ exports.changeSeriesData = async (req, res) => {
     try{
         await client.connect()
         const db = client.db(process.env.DB_NAME)
-        const { seriesId, title, author, illustrator, publisher, genres, keywords, img, description, imgChange} = req.body
+        const { seriesId, title, author, illustrator, publisher, genres, keywords, img, description, imgChange, isKeywordChange} = req.body
         const date = Date.now()
         await db.collection('series').updateOne({seriesId},{
             $set: {
@@ -297,11 +335,80 @@ exports.changeSeriesData = async (req, res) => {
             } 
         })
         if(imgChange.isImageChange){
-            console.log(imgChange.previousImage)
+            // console.log(imgChange.previousImage)
+            const aws = require('aws-sdk')
+            aws.config.update({
+                secretAccessKey: process.env.AWS_S3_SECRET_ACCESS_KEY,
+                accessKeyId: process.env.AWS_S3_ACCESS_KEY_ID,
+                region: process.env.AWS_S3_REGION,
+            })
+            const s3 = new aws.S3()
+            const removePath = process.env.AWS_S3_URL + '/'
+            const key = imgChange.previousImage.replaceAll(removePath, '')
+            await s3.deleteObject({ 
+                Bucket: process.env.AWS_S3_BUCKET_NAME,
+                Key: key 
+            }).promise()
         }
         res.status(201).send({
             message: "update series success",
         })
+        if(isKeywordChange){
+            reCalCos(db)
+        }
+    } catch (err) {
+        console.log(err)
+        res.status(500).send({message: 'This service not available', err})
+    } finally {
+        // await client.close()
+    }
+}
+
+exports.deleteSeries = async (req, res) => {
+    const client = new MongoClient(process.env.MONGODB_URI)
+    try{
+        await client.connect()
+        const db = client.db(process.env.DB_NAME)
+        await db.collection('series').updateOne({ seriesId: parseInt(req.query.seriesId) }, {
+            $set: {
+                status: 'delete'
+            }
+        })
+        res.status(200).send('success')
+    } catch (err) {
+        console.log(err)
+        res.status(500).send({message: 'This service not available', err})
+    } finally {
+        // await client.close()
+    }
+}
+
+exports.permanentlyDeleteSeries = async (req, res) => {
+    const client = new MongoClient(process.env.MONGODB_URI)
+    try{
+        await client.connect()
+        const db = client.db(process.env.DB_NAME)
+        const listImg = await db.collection('series').findOneAndDelete({ seriesId: parseInt(req.query.seriesId) }, {
+            projection: {
+                _id: 0,
+                img: 1,
+            }
+        })
+        const targetImg = listImg.value.img
+        const aws = require('aws-sdk')
+        aws.config.update({
+            secretAccessKey: process.env.AWS_S3_SECRET_ACCESS_KEY,
+            accessKeyId: process.env.AWS_S3_ACCESS_KEY_ID,
+            region: process.env.AWS_S3_REGION,
+        })
+        const s3 = new aws.S3()
+        const removePath = process.env.AWS_S3_URL + '/'
+        const key = targetImg.replaceAll(removePath, '')
+        await s3.deleteObject({ 
+            Bucket: process.env.AWS_S3_BUCKET_NAME,
+            Key: key
+        }).promise()
+        res.status(200).send('success')
     } catch (err) {
         console.log(err)
         res.status(500).send({message: 'This service not available', err})
@@ -315,35 +422,8 @@ exports.reCalculateCos = async (req, res) => {
         const client = new MongoClient(process.env.MONGODB_URI)
         await client.connect()
         const db = client.db(process.env.DB_NAME)
-        const counter = await db.collection('counters').findOne({_id: 'seriesId'})
-        const productCounter = counter.seq - 1
-        db.collection('series').find({}, {
-            projection: {
-                _id: 0,
-                seriesId: 1,
-                title: 1,
-                keywords: 1,
-            }
-        }).toArray( async (err, result) => {
-            const arr = [...result]
-            // get cosineSimilarity
-            const new_cosine_sim = Array(productCounter).fill().map(() => Array(productCounter))
-            var cosine_sim
-
-            for(let i=0; i<arr.length; i++){
-                for(let j=i+1; j<arr.length; j++){
-                    cosine_sim = cosineSimilarity(arr[i], arr[j])
-                    new_cosine_sim[arr[i].seriesId-1][arr[j].seriesId-1] = cosine_sim
-                    new_cosine_sim[arr[j].seriesId-1][arr[i].seriesId-1] = cosine_sim
-                }
-                new_cosine_sim[arr[i].seriesId-1][arr[i].seriesId-1] = 1
-            }
-            res.send(new_cosine_sim)
-            db.collection('cosineTable').updateOne({name: 'origin'},{
-                $set: {data: new_cosine_sim}
-            })
-            sortCosineTable(db, new_cosine_sim)
-        })
+        const data = await reCalCos(db)
+        res.send(data)
     } catch (err) {
         console.log(err)
         res.status(500).send({message: 'This service not available', err})
@@ -387,6 +467,37 @@ async function calculateCos(db){
         $set: {data: new_cosine_sim}
     })
     await sortCosineTable(db, new_cosine_sim)
+}
+
+async function reCalCos(db){
+    const counter = await db.collection('counters').findOne({_id: 'seriesId'})
+    const productCounter = counter.seq - 1
+    const data = await db.collection('series').find({}, {
+        projection: {
+            _id: 0,
+            seriesId: 1,
+            title: 1,
+            keywords: 1,
+        }
+    }).toArray()
+    const arr = [...data]
+    // get cosineSimilarity
+    const new_cosine_sim = Array(productCounter).fill().map(() => Array(productCounter))
+    var cosine_sim
+
+    for(let i=0; i<arr.length; i++){
+        for(let j=i+1; j<arr.length; j++){
+            cosine_sim = cosineSimilarity(arr[i], arr[j])
+            new_cosine_sim[arr[i].seriesId-1][arr[j].seriesId-1] = cosine_sim
+            new_cosine_sim[arr[j].seriesId-1][arr[i].seriesId-1] = cosine_sim
+        }
+        new_cosine_sim[arr[i].seriesId-1][arr[i].seriesId-1] = 1
+    }
+    db.collection('cosineTable').updateOne({name: 'origin'},{
+        $set: {data: new_cosine_sim}
+    })
+    sortCosineTable(db, new_cosine_sim)
+    return new_cosine_sim
 }
 
 function cosineSimilarity(p1, p2){
@@ -457,7 +568,6 @@ async function sortCosineTable(db, data){
                 }
             })
         })
-        // var newData = JSON.stringify(newData)
         await db.collection('cosineTable').updateOne({name: 'sort'}, {
             $set: { data: newData }
         })
@@ -494,7 +604,7 @@ exports.getOrders = async (req, res) => {
         const db = client.db(process.env.DB_NAME)
 
         var status_sort = req.query.sort || 'all'
-        var pages = req.query.pages || 1
+        var pages = parseInt(req.query.pages) || 1
         var pageLimit = 10
         var query = {}
         // if status = 'all' query condition = {}

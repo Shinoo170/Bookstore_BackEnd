@@ -16,7 +16,9 @@ router.post('/addSeries', [jwt_middleware.isAdmin, middleware.checkSeries], cont
 
 router.patch('/series', [jwt_middleware.isAdmin, middleware.checkSeriesNameChange], controller.changeSeriesData)
 
-router.get('/reCalculateCos', controller.reCalculateCos)
+router.delete('/series', jwt_middleware.isAdmin, controller.deleteSeries)
+
+router.get('/reCalculateCos', jwt_middleware.isAdmin, controller.reCalculateCos)
 
 router.get('/getOrders', jwt_middleware.isAdmin, controller.getOrders)
 

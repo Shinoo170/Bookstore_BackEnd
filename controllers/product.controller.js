@@ -9,7 +9,7 @@ exports.getAllSeries = async (req, res) => {
         await client.connect()
         const db = client.db(process.env.DB_NAME)
         const result = await db.collection('series')
-            .find({})
+            .find({ status: { $ne: 'delete' } })
             .project({
                 _id: 0,
                 seriesId: 1,
@@ -44,13 +44,16 @@ exports.getSeriesDetails = async (req, res) => {
         await client.connect()
         const db = client.db(process.env.DB_NAME)
         const params = req.params
-        const seriesData = await db.collection('series').findOne({ seriesId: parseInt(params.seriesId) }, {
+        const seriesData = await db.collection('series').findOne({ seriesId: parseInt(params.seriesId), status: { $ne: 'delete' }  }, {
             projection: {
                 _id: 0,
                 cosineSimilarity: 0,
                 subscribe: 0,
             }
         })
+        if(!seriesData){
+            res.status(400).send({ message: 'No series found!' })
+        }
         const manga = await db.collection('products')
             .find({ _id: { $in: seriesData.products.mangaId } })
             .project({
@@ -87,11 +90,7 @@ exports.getSeriesDetails = async (req, res) => {
             }).limit(8).toArray()
         const other = await db.collection('products').find({ _id: { $in: seriesData.products.otherId} }).limit(8).toArray()
         
-        if(seriesData && manga && novel && other){
-            res.status(200).send({seriesData, productData: { manga, novel, other} })
-        } else {
-            res.status(400).send({ message: 'No series found!' })
-        }
+        res.status(200).send({seriesData, productData: { manga, novel, other} })
     } catch (err) {
         console.log(err)
         res.status(500).send({message: 'This service not available', err})
@@ -107,7 +106,7 @@ exports.getProductInSeries = async (req, res) => {
         const db = client.db(process.env.DB_NAME)
         const query = req.query
         const target = query.category.toLowerCase() + 'Id'
-        const listProductId = await db.collection('series').findOne({seriesId: parseInt(query.seriesId)},{
+        const listProductId = await db.collection('series').findOne({seriesId: parseInt(query.seriesId), status: { $ne: 'delete' } },{
             projection: {
                 _id:0,
                 products: { [target]: 1 }
@@ -135,16 +134,19 @@ exports.getProduct = async (req, res) => {
         const params = req.params
         const query = req.query
         const target = query.category.toLowerCase() + 'Id'
-        const productDetails = await db.collection('products').findOne({ url: params.productURL })
-
-        const seriesDetails = await db.collection('series').findOne({ seriesId: parseInt(query.seriesId)},{
+        const productDetails = await db.collection('products').findOne({ url: params.productURL, status: { $ne: 'delete' } })
+        if( !productDetails ){
+            return res.status(404).send() 
+        }
+        var seriesDetails = await db.collection('series').findOne({ seriesId: parseInt(query.seriesId)},{
             projection: {
                 _id: 0,
+                title: 1,
                 author: 1,
                 illustrator: 1,
                 publisher: 1,
                 genres: 1,
-                cosineSimilarity: 1,
+                cosineSimilarity: { $slice: 10 },
                 products: { [target]: 1 }
             }
         })
@@ -167,8 +169,7 @@ exports.getProduct = async (req, res) => {
             score: 1,
         }).limit(10).toArray()
 
-        if( productDetails === null ) res.status(404).send()
-        else res.status(200).send({productDetails, seriesDetails, otherProducts , similarProducts})
+        res.status(200).send({productDetails, seriesDetails, otherProducts , similarProducts})
     } catch (err) {
         console.log(err)
         res.status(500).send({message: 'This service not available', err})
@@ -210,7 +211,7 @@ exports.getLatestSeries = async (req, res) => {
     try{
         await client.connect()
         const db = client.db(process.env.DB_NAME)
-        const data = await db.collection('series').find({}).project({
+        const data = await db.collection('series').find({ status: { $ne: 'delete' } }).project({
             _id: 0,
             seriesId: 1,
             title: 1,
@@ -247,7 +248,7 @@ exports.getLatestProduct = async (req, res) => {
     try{
         await client.connect()
         const db = client.db(process.env.DB_NAME)
-        const data = await db.collection('products').find({}).limit(10).sort({productId: -1}).toArray()
+        const data = await db.collection('products').find({ status: { $ne: 'delete' } }).limit(10).sort({productId: -1}).toArray()
             if(data){
                 res.status(200).send(data)
             }else{
@@ -266,7 +267,7 @@ exports.getMostSoldProduct = async (req, res) => {
     try{
         await client.connect()
         const db = client.db(process.env.DB_NAME)
-        const data = await db.collection('products').find({}).limit(10).sort({sold: -1}).toArray()
+        const data = await db.collection('products').find({ status: { $ne: 'delete' } }).limit(10).sort({sold: -1}).toArray()
         if(data){
             res.status(200).send(data)
         }else{
@@ -548,8 +549,46 @@ exports.deleteReview = async (req, res) => {
         await client.connect()
         const db = client.db(process.env.DB_NAME)
         const _id = new ObjectId(req.query.reviewId)
-        await db.collection('review').deleteOne({ _id })
+        const user_id = new ObjectId(req.user_id)
+        await db.collection('review').deleteOne({ _id, user_id })
+
         res.status(200).send('success')
+
+        const product = await db.collection('products').findOne({productId: parseInt(req.query.productId)}, {
+            projection: {
+                _id: 0,
+                score: 1
+            }
+        })
+        const series = await db.collection('series').findOne({seriesId: parseInt(req.query.seriesId)}, {
+            projection: {
+                _id: 0,
+                score: 1
+            }
+        })
+        const score = parseInt(req.query.score)
+        var productAvg
+        var seriesAvg
+        if(product.score.count > 1){
+            productAvg = Math.round(((product.score.avg * product.score.count) - score) / (product.score.count - 1) *100)/100
+        } else {
+            // divide by 0 is infinity
+            productAvg = 0
+        }
+        if(series.score.count > 1){
+            seriesAvg = Math.round(((series.score.avg * series.score.count) - score) / (series.score.count - 1) *100)/100
+        } else {
+            // divide by 0 is infinity
+            seriesAvg = 0
+        }
+        await db.collection('products').updateOne({productId: parseInt(req.query.productId)}, {
+            $set : { 'score.avg' : productAvg },
+            $inc: { 'score.count': -1 }
+        })
+        await db.collection('series').updateOne({seriesId: parseInt(req.query.seriesId)}, {
+            $set : { 'score.avg' : seriesAvg },
+            $inc: { 'score.count': -1 }
+        })
     } catch (err) {
         console.log(err)
         res.status(500).send({message: 'This service not available', err})

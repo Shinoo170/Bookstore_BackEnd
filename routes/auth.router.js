@@ -12,4 +12,6 @@ router.post('/test', authJwt.verifyToken, (req, res) => {
     res.status(200).send('Allow to access')
 })
 
+router.post('/verifyEmail', controller.verifyEmail)
+
 module.exports = router
