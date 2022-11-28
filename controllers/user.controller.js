@@ -500,6 +500,7 @@ exports.placeOrder = async (req, res) => {
                     transactionHash: hash,
                     chain,
                 })
+                console.log(transaction)
                 await new Promise((resolve) => {
                     setTimeout(resolve, 1000)
                 })
