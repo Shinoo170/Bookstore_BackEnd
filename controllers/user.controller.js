@@ -373,10 +373,13 @@ exports.placeOrder = async (req, res) => {
             address: selectAddress,
             status: 'ordered',
         }
-        if(( refund > 0 ) && (method === 'metamask') ){
-            orderDetail.paymentDetails.refund = true
-            orderDetail.paymentDetails.refundDetails = {
-                refundTotal: refund,
+        if(method === 'metamask'){
+            orderDetail.paymentDetails.hash = req.body.hash
+            if( refund > 0){
+                orderDetail.paymentDetails.refund = true
+                orderDetail.paymentDetails.refundDetails = {
+                    refundTotal: refund,
+                }
             }
         }
         await db.collection('orders').insertOne(orderDetail)
