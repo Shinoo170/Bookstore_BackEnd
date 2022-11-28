@@ -357,12 +357,12 @@ exports.placeOrder = async (req, res) => {
             }
         })
 
-        const total = Math.round(amount * 100) / 100
+        var total = Math.round(amount * 100) / 100
         const orderId = await mongoUtil.getNextSequence(db, 'orderId')
         var orderDetail = {
             orderId,
             user_id,
-            total,
+            total: totalPriceSummary,
             shippingFee: shippingFee,
             exchange_rate,
             method,
@@ -404,7 +404,7 @@ exports.placeOrder = async (req, res) => {
             var headers = {
                 'Content-Type': 'application/x-www-form-urlencoded'
             }
-            var dataString = 'amount=' + amount*100 + '&currency=thb&card=' + req.body.token
+            var dataString = 'amount=' + totalPriceSummary*100 + '&currency=thb&card=' + req.body.token
             var options = {
                 url: 'https://api.omise.co/charges',
                 method: 'POST',
