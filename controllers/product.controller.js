@@ -282,6 +282,25 @@ exports.getMostSoldProduct = async (req, res) => {
     }
 }
 
+exports.getPreOrderProduct = async (req, res) => {
+    const client = new MongoClient(process.env.MONGODB_URI)
+    try{
+        await client.connect()
+        const db = client.db(process.env.DB_NAME)
+        const data = await db.collection('products').find({ status: 'preOrder' }).sort({addDate: -1}).toArray()
+        if(data){
+            res.status(200).send(data)
+        }else{
+            res.status(400).send({message: 'No product found!', err})
+        }
+    } catch (err) {
+        console.log(err)
+        res.status(500).send({message: 'This service not available', err})
+    } finally {
+        // await client.close()
+    }
+}
+
 // Genres
 exports.getAllGenres = async (req, res) => {
     const client = new MongoClient(process.env.MONGODB_URI)

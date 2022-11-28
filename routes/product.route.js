@@ -27,6 +27,10 @@ router.get('/latestProduct', controller.getLatestProduct)
 // Get most sold product
 router.get('/mostSoldProduct', controller.getMostSoldProduct)
 
+// get pre order product
+router.get('/getPreOrder', controller.getPreOrderProduct)
+
+// get genres
 router.get('/genres', controller.getAllGenres)
 
 // Get review
