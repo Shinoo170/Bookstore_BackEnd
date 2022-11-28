@@ -14,4 +14,6 @@ router.post('/test', authJwt.verifyToken, (req, res) => {
 
 router.post('/verifyEmail', controller.verifyEmail)
 
+router.post('/SendVerifyCode', controller.SendVerifyCode)
+
 module.exports = router

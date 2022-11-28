@@ -51,24 +51,12 @@ exports.signup = async (req, res) => {
                 // expiresIn: "7d"
             }
         )
-        // const url = process.env.FRONTEND_URL + '/verifyEmail?token=' + token
-        // const msg = {
-        //     to: email,
-        //     from: {
-        //         email: 'ptbookstore@outlook.com', //email ผู้ส่ง
-        //         name: 'PT Bookstore' // ชื่อผู้ส่ง
-        //     },
-        //     templateId: 'd-e63dcd9b1bee4caca1ba68e944ed7fdc', //code template ดูได้ที่ https://mc.sendgrid.com/dynamic-templates
-        //     dynamicTemplateData:{ //ชื่อตัวแปรในแต่ละ template
-        //         link_verifired: url
-        //     }
-        // }
         await db.collection('unVerifiedEmail').insertOne({
             email,
             code: verifyCode,
             date: Date.now()
         })
-        sendMail.send(msg).then(response => { }).catch(error => console.log(error.massage))
+        sendEmail(email, token)
         res.status(201).send({
             message: "Register success"
         })
@@ -138,7 +126,23 @@ function randomString(length) {
        result += characters.charAt(Math.floor(Math.random() * charactersLength));
     }
     return result;
- }
+}
+
+function sendEmail(email, token){
+    const url = process.env.FRONTEND_URL + '/verifyEmail?token=' + token
+    const msg = {
+        to: email,
+        from: {
+            email: 'ptbookstore@outlook.com', //email ผู้ส่ง
+            name: 'PT Bookstore' // ชื่อผู้ส่ง
+        },
+        templateId: 'd-e63dcd9b1bee4caca1ba68e944ed7fdc', //code template ดูได้ที่ https://mc.sendgrid.com/dynamic-templates
+        dynamicTemplateData:{ //ชื่อตัวแปรในแต่ละ template
+            link_verifired: url
+        }
+    }
+    sendMail.send(msg).then(response => { }).catch(error => console.log(error.massage))
+}
 
 
 exports.SendVerifyCode = async (req, res) => {
@@ -146,23 +150,44 @@ exports.SendVerifyCode = async (req, res) => {
     try{
         await client.connect()
         const db = client.db(process.env.DB_NAME)
-        let { email } = req.body
+        const { email } = req.body
+        const verifyCode = randomString(10)
         let findEmail = await db.collection('users').findOne({
-            email: req.body.email
-        })
+            // $and: [ {email: req.body.email}, {'userData.verifiedEmail': false} ]
+            email: req.body.email,
+            'userData.verifiedEmail': false
+        }, { projection: {
+            _id: 0,
+            email: 1,
+        }})
         if( findEmail ){
-            await db.collection('unVerifiedEmail').findOneAndUpdate(
+            const result = await db.collection('unVerifiedEmail').findOneAndUpdate(
                 { email },
-                { code: generateCode(), date: Date.now() },
+                { $set: { code: verifyCode, date: Date.now() } },
             )
-            res.status(200).send({ message: 'send success'})
+            const token = jwt.sign(
+                {
+                    email,
+                    code: verifyCode,
+                },
+                process.env.TOKEN_KEY,
+                {
+                    // expiresIn: "7d"
+                }
+            )
+            sendEmail(email, token)
+            if(result.value){
+                res.status(200).send({ message: 'send success'})
+            } else {
+                await db.collection('unVerifiedEmail').insertOne({
+                    email,
+                    code: verifyCode,
+                    date: Date.now() 
+                })
+                res.status(200).send({ message: 'send success'})
+            }
         } else {
-            await db.collection('unVerifiedEmail').insertOne({
-                email,
-                code: generateCode(),
-                date: Date.now()
-            })
-            res.status(200).send({ message: 'send success'})
+            res.status(400).send({ message: 'This email already verify' })
         }
     } catch (err) {
         console.log(err)
@@ -176,13 +201,13 @@ exports.verifyEmail = async (req, res) => {
     const client = new MongoClient(process.env.MONGODB_URI)
     const { token } = req.body
     if(!token){
-        return res.status(403).send({ message: "No token!", thai_message: 'ไม่พบ Token' })
+        return res.status(403).send({ message: "No token!", thai_message: 'ไม่พบ Token', code: 'invalid_token'})
     }
     jwt.verify(token, process.env.TOKEN_KEY, async (err, decoded) => {
         if (err) {
             // Expire or Invalid
             console.log(err.message)
-            return res.status(401).send({ message: "Invalid token!", error: err.message, thai_message: 'Token ไม่ถูกต้อง' })
+            return res.status(401).send({ message: "Invalid token!", error: err.message, thai_message: 'Token ไม่ถูกต้อง', code: 'invalid_token'})
         }
         const email = decoded.email
         const code = decoded.code
@@ -198,16 +223,11 @@ exports.verifyEmail = async (req, res) => {
                     }
                 })
             } else {
-                res.status(400).send({message: 'Email already verified', thai_message: 'อีเมลนี้ยืนยันแล้ว'})
-                await db.collection('users').updateOne({email: email}, {
-                    $set: {
-                        'userData.verifiedEmail': true
-                    }
-                })
+                res.status(400).send({message: 'Email already verified', thai_message: 'อีเมลนี้ยืนยันแล้ว', code: 'already_verify'})
             }
         } catch (err) {
             console.log(err)
-            res.status(500).send({message: 'This service not available', err, thai_message: 'ระบบปิดให้บริการ'})
+            res.status(500).send({message: 'This service not available', err, thai_message: 'ระบบปิดให้บริการ', code: 'server_error'})
         } finally {
             await client.close()
         }

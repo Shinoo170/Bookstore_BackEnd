@@ -315,13 +315,18 @@ exports.placeOrder = async (req, res) => {
                 _id: 0,
                 seriesId: 1,
                 productId: 1,
+                title: 1,
+                bookNum: 1,
+                thai_category: 1,
                 status: 1,
                 price: 1,
                 amount: 1,
+                img: 1,
             }).toArray()
 
         var totalPriceSummary = shippingFee
         var refund = 0
+        var seriesId = []   // update series sold count
         const finalOrder = cart.map((element) => {
             const productIndex = product.findIndex(e => e.productId === element.productId)
             var finalAmount = element.amount
@@ -330,6 +335,7 @@ exports.placeOrder = async (req, res) => {
                 refund += Math.round( ((element.amount - finalAmount) * product[productIndex].price) / exchange_rate * 100) / 100
             }
             totalPriceSummary +=  Math.round(finalAmount * product[productIndex].price / exchange_rate * 100) / 100
+            seriesId.push({seriesId: product[productIndex].seriesId, amount: finalAmount})
             return {
                 productId: element.productId,
                 amount: finalAmount,
@@ -341,6 +347,14 @@ exports.placeOrder = async (req, res) => {
             await db.collection('products').updateOne({productId: element.productId}, {
                 $inc : { amount: -element.amount, sold: element.amount }
             })
+        })
+
+        const finalOrderDetails = finalOrder.map(element => {
+            const productIndex = product.findIndex(e => e.productId === element.productId)
+            return {
+                ...product[productIndex],
+                amount: element.amount,
+            }
         })
 
         const total = Math.round(amount * 100) / 100
@@ -369,18 +383,19 @@ exports.placeOrder = async (req, res) => {
         // ! reset cart
         await db.collection('users').updateOne({ _id }, {
             $push: { order: orderId },
-            // $set : {
-            //     cart: {
-            //         list: [],
-            //         created: data,
-            //         expired: data + 7*24*60*60*1000,
-            //     }
-            // }
+            $set : {
+                cart: {
+                    list: [],
+                    created: Date.now(),
+                    expired: Date.now() + 7*24*60*60*1000,
+                }
+            }
         })
         res.send({
             message: 'place order successful',
             status: 'successful',
             orderId,
+            finalOrder: finalOrderDetails,
         })
         if( method === 'credit_card'){
             var headers = {
@@ -437,6 +452,14 @@ exports.placeOrder = async (req, res) => {
                                 status: 'paid',
                             }
                         })
+                        seriesId.forEach(async (element, index) => {
+                            await db.collection('series').updateOne({seriesId: element.seriesId}, {
+                                $inc: {
+                                    sold: element.amount
+                                }
+                            })
+                        })
+                        
                         return
                     }
                 } else {

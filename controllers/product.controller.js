@@ -228,7 +228,8 @@ exports.getLatestSeries = async (req, res) => {
                 totalManga: 1,
                 totalNovel: 1,
                 totalOther: 1,
-            }
+            },
+            sold: 1,
         }).sort({lastModify: -1}).toArray()
         if(data){
             res.status(200).send(data)
@@ -305,7 +306,7 @@ exports.isUserSubscribe = async (req, res) => {
         const db = client.db(process.env.DB_NAME)
         const seriesId = parseInt(req.query.seriesId)
         const user_id = new ObjectId(req.user_id)
-        const data = await db.collection('series').findOne({ seriesId, subscribe: [user_id] })
+        const data = await db.collection('series').findOne({ seriesId, subscribe: user_id }, { projection: { _id:0, seriesId:1 }})
         if(data){
             res.status(200).send(true)
         } else {
@@ -387,7 +388,7 @@ exports.isUserWishlist = async (req, res) => {
         const db = client.db(process.env.DB_NAME)
         const productId = parseInt(req.query.productId)
         const user_id = new ObjectId(req.user_id)
-        const data = await db.collection('products').findOne({ productId, wishlists: [user_id] })
+        const data = await db.collection('products').findOne({ productId, wishlists: user_id }, { projection: { _id:0, productId:1 }})
         if(data){
             res.status(200).send(true)
         } else {

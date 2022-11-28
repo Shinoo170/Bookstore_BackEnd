@@ -5,7 +5,8 @@ const { MongoClient } = require('mongodb')
 const ObjectId = require('mongodb').ObjectId
 const Moralis = require('moralis').default
 const { EvmChain } = require('@moralisweb3/evm-utils')
-
+let sendMail = require('@sendgrid/mail')
+sendMail.setApiKey(process.env.MAIL_API_KEY)
 
 exports.addProduct = async (req, res) => {
     const client = new MongoClient(process.env.MONGODB_URI)
@@ -63,14 +64,32 @@ exports.addProduct = async (req, res) => {
                 subscribe: 1,
             }
         })
-        res.status(201).send({
-            message: "Add product success",
-        })
+        res.status(201).send({ message: "Add product success", })
 
         // Notify to subscriber
-        // const subscriber = seriesData.value.subscribe
-        // const subscriber_email = await db.collection('users').find({ _id: { $in: subscriber} }).project({ _id:0, email: 1}).toArray()
-        // console.log(subscriber_email)
+        const subscriber = seriesData.value.subscribe
+        const subscriber_email = await db.collection('users').find({ _id: { $in: subscriber}, 'userData.verifiedEmail': true }).project({ _id:0, email: 1}).toArray()
+        var book_name = title
+        if(thai_category !== 'สินค้า'){ 
+            book_name = '[' + thai_category + '] ' + book_name + ' เล่มที่ ' + bookNum
+        }
+        subscriber_email.forEach((element) => {
+            const path = process.env.FRONTEND_URL + '/series/' + seriesId + '/' + url
+            const msg = {
+                to: element,
+                from: {
+                    email: 'ptbookstore@outlook.com', //email ผู้ส่ง
+                    name: 'PT Bookstore' // ชื่อผู้ส่ง
+                },
+                templateId: 'd-0e66e60636fc4451ad4790b947798ec2', //code template ดูได้ที่ https://mc.sendgrid.com/dynamic-templates
+                dynamicTemplateData:{ //ชื่อตัวแปรในแต่ละ template
+                    book_name,
+                    link_toWeb: path,
+                    book_photo: img,
+                }
+            }
+            sendMail.send(msg).then(response => { }).catch(error => console.log(error.massage))
+        })
     } catch (err) {
         console.log(err)
         res.status(500).send({message: 'This service not available', err})
@@ -84,12 +103,12 @@ exports.changeProductData = async (req, res) => {
     try{
         await client.connect()
         const db = client.db(process.env.DB_NAME)
-        const { seriesId, url,category, thai_category, status, price, amount, description, isImageChange, isCategoryChange, isUrlChange } = req.body
+        const { seriesId, url,category, thai_category, status, price, amount, description, isImageChange, isCategoryChange, isUrlChange, isNotify } = req.body
         const date = Date.now()
         const updateData = {
             status,
-            price,
-            amount,
+            price: parseInt(price),
+            amount: parseInt(amount),
             description,
             lastModify: date
         }
@@ -130,9 +149,6 @@ exports.changeProductData = async (req, res) => {
             updateData.category = category
             updateData.thai_category = thai_category
         }
-        await db.collection('products').updateOne({url},{
-            $set: updateData
-        })
         if(isCategoryChange){
             const _id = new ObjectId(req.body.id)
             var previousTotalTarget = 'products.total' + req.body.previousCategory.charAt(0).toUpperCase() + req.body.previousCategory.slice(1)
@@ -147,7 +163,7 @@ exports.changeProductData = async (req, res) => {
                 $push: {
                     [TargetId]: _id,
                 },
-                $pull : {
+                $pull: {
                     [previousTargetId]: _id,
                 },
                 $set: {
@@ -156,13 +172,57 @@ exports.changeProductData = async (req, res) => {
             })
         }
 
-        await db.collection('products').updateOne({ url: req.body.url }, {
-            $set: updateData
-        })
-        res.status(201).send({
-            message: "update product success",
-            url: targetUrl,
-        })
+        if(isNotify){
+            // Not update yet, must query by old url
+            const data = await db.collection('products').findOneAndUpdate({ url }, {
+                $set: updateData
+            }, {
+                projection: {
+                    _id: 0,
+                    img: 1,
+                    title: 1,
+                    bookNum: 1,
+                    thai_category: 1,
+                    wishlists: 1,
+                }
+            })
+            res.status(201).send({
+                message: "update product success",
+                url: targetUrl,
+            })
+            const img = data.value.img[0]
+            const wishlists = data.value.wishlists
+            const wishlists_email = await db.collection('users').find({ _id: { $in: wishlists}, 'userData.verifiedEmail': true }).project({ _id:0, email: 1}).toArray()
+            var book_name = data.value.title
+            if(data.value.thai_category !== 'สินค้า'){ 
+                book_name = '[' + data.value.thai_category + '] ' + book_name + ' เล่มที่ ' + data.value.bookNum
+            }
+            wishlists_email.forEach((element) => {
+                const path = process.env.FRONTEND_URL + '/series/' + seriesId + '/' + targetUrl
+                const msg = {
+                    to: element,
+                    from: {
+                        email: 'ptbookstore@outlook.com', //email ผู้ส่ง
+                        name: 'PT Bookstore' // ชื่อผู้ส่ง
+                    },
+                    templateId: 'd-5fa6a6f05c8445d68f7c976e3d6b1c88', //code template ดูได้ที่ https://mc.sendgrid.com/dynamic-templates
+                    dynamicTemplateData:{ //ชื่อตัวแปรในแต่ละ template
+                        book_name,
+                        link_toWeb: path,
+                        book_photo: img,
+                    }
+                }
+                sendMail.send(msg).then(response => { }).catch(error => console.log(error.massage))
+            })
+        } else {
+            await db.collection('products').updateOne({ url: req.body.url }, {
+                $set: updateData
+            })
+            res.status(201).send({
+                message: "update product success",
+                url: targetUrl,
+            })
+        }
     } catch (err) {
         console.log(err)
         res.status(500).send({message: 'This service not available', err})
@@ -300,6 +360,7 @@ exports.addSeries = async (req, res) => {
                 otherId: [],
             },
             subscribe: [],
+            sold: 0,
         })
         res.status(201).send({
             message: "Add series success",
