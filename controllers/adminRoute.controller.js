@@ -792,3 +792,56 @@ exports.updateOrder = async (req, res) => {
         // await client.close()
     }
 }
+
+exports.deleteReview = async (req, res) => {
+    const client = new MongoClient(process.env.MONGODB_URI)
+    try{
+        await client.connect()
+        const db = client.db(process.env.DB_NAME)
+        const _id = new ObjectId(req.query.reviewId)
+        await db.collection('review').deleteOne({ _id })
+
+        res.status(200).send('success')
+
+        const product = await db.collection('products').findOne({productId: parseInt(req.query.productId)}, {
+            projection: {
+                _id: 0,
+                score: 1
+            }
+        })
+        const series = await db.collection('series').findOne({seriesId: parseInt(req.query.seriesId)}, {
+            projection: {
+                _id: 0,
+                score: 1
+            }
+        })
+        const score = parseInt(req.query.score)
+        var productAvg
+        var seriesAvg
+        if(product.score.count > 1){
+            productAvg = Math.round(((product.score.avg * product.score.count) - score) / (product.score.count - 1) *100)/100
+        } else {
+            // divide by 0 is infinity
+            productAvg = 0
+        }
+        if(series.score.count > 1){
+            seriesAvg = Math.round(((series.score.avg * series.score.count) - score) / (series.score.count - 1) *100)/100
+        } else {
+            // divide by 0 is infinity
+            seriesAvg = 0
+        }
+        await db.collection('products').updateOne({productId: parseInt(req.query.productId)}, {
+            $set : { 'score.avg' : productAvg },
+            $inc: { 'score.count': -1 }
+        })
+        await db.collection('series').updateOne({seriesId: parseInt(req.query.seriesId)}, {
+            $set : { 'score.avg' : seriesAvg },
+            $inc: { 'score.count': -1 }
+        })
+    } catch (err) {
+        console.log(err)
+        res.status(500).send({message: 'This service not available', err})
+    } finally {
+        // await client.close()
+    }
+}

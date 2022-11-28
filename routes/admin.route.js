@@ -32,4 +32,6 @@ router.get('/getOrderDetails', jwt_middleware.isAdmin, controller.getOrderDetail
 
 router.post('/addGenres', jwt_middleware.isAdmin, controller.addGenres)
 
+router.delete('/deleteUserReview', jwt_middleware.isAdmin, controller.deleteReview)
+
 module.exports = router
