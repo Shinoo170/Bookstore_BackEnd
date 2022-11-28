@@ -492,18 +492,16 @@ exports.placeOrder = async (req, res) => {
             var transaction = null
             
             await Moralis.start({ apiKey: process.env.MORALIS_API_KEY, })
-            var i = 0
             while( transaction === null){
-                console.log(i)
-                i++
-                transaction = await Moralis.EvmApi.transaction.getTransaction({
-                    transactionHash: hash,
-                    chain,
-                })
-                console.log(transaction)
-                await new Promise((resolve) => {
-                    setTimeout(resolve, 1000)
-                })
+                try {
+                    transaction = await Moralis.EvmApi.transaction.getTransaction({
+                        transactionHash: hash,
+                        chain,
+                    })
+                    await new Promise((resolve) => {
+                        setTimeout(resolve, 1000)
+                    })
+                } catch (error) { }
             }
             const paidDate = Date.now()
             var orderUpdate = {
