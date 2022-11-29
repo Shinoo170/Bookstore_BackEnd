@@ -94,7 +94,7 @@ exports.addProduct = async (req, res) => {
         console.log(err)
         res.status(500).send({message: 'This service not available', err})
     } finally {
-        // await client.close()
+        await client.close()
     }
 }
 
@@ -227,7 +227,7 @@ exports.changeProductData = async (req, res) => {
         console.log(err)
         res.status(500).send({message: 'This service not available', err})
     } finally {
-        // await client.close()
+        await client.close()
     }
 }
 
@@ -265,7 +265,7 @@ exports.deleteProduct = async (req, res) => {
         console.log(err)
         res.status(500).send({message: 'This service not available', err})
     } finally {
-        await client.close()
+        // await client.close()
     }
 }
 
@@ -319,7 +319,7 @@ exports.permanentlyDeleteProduct = async (req, res) => {
         console.log(err)
         res.status(500).send({message: 'This service not available', err})
     } finally {
-        // await client.close()
+        await client.close()
     }
 }
 
@@ -370,7 +370,7 @@ exports.addSeries = async (req, res) => {
         console.log(err)
         res.status(500).send({message: 'This service not available', err})
     } finally {
-        // await client.close()
+        await client.close()
     }
 
 }
@@ -421,7 +421,7 @@ exports.changeSeriesData = async (req, res) => {
         console.log(err)
         res.status(500).send({message: 'This service not available', err})
     } finally {
-        // await client.close()
+        await client.close()
     }
 }
 
@@ -440,7 +440,7 @@ exports.deleteSeries = async (req, res) => {
         console.log(err)
         res.status(500).send({message: 'This service not available', err})
     } finally {
-        // await client.close()
+        await client.close()
     }
 }
 
@@ -474,7 +474,7 @@ exports.permanentlyDeleteSeries = async (req, res) => {
         console.log(err)
         res.status(500).send({message: 'This service not available', err})
     } finally {
-        // await client.close()
+        await client.close()
     }
 }
 
@@ -682,7 +682,7 @@ exports.getOrders = async (req, res) => {
         console.log(err)
         res.status(500).send({message: 'This service not available', err})
     } finally {
-        // await client.close()
+        await client.close()
     }
 }
 
@@ -697,7 +697,7 @@ exports.getAllOrders = async (req, res) => {
         console.log(err)
         res.status(500).send({message: 'This service not available', err})
     } finally {
-        // await client.close()
+        await client.close()
     }
 }
 
@@ -712,7 +712,7 @@ exports.getPaidOrder = async (req, res) => {
         console.log(err)
         res.status(500).send({message: 'This service not available', err})
     } finally {
-        // await client.close()
+        await client.close()
     }
 }
 
@@ -752,7 +752,7 @@ exports.getOrderDetails = async (req, res) => {
         console.log(err)
         res.status(500).send({message: 'This service not available', err})
     } finally {
-        // await client.close()
+        await client.close()
     }
 }
 
@@ -789,7 +789,7 @@ exports.updateOrder = async (req, res) => {
         console.log(err)
         res.status(500).send({message: 'This service not available', err})
     } finally {
-        // await client.close()
+        await client.close()
     }
 }
 
@@ -842,6 +842,6 @@ exports.deleteReview = async (req, res) => {
         console.log(err)
         res.status(500).send({message: 'This service not available', err})
     } finally {
-        // await client.close()
+        await client.close()
     }
 }

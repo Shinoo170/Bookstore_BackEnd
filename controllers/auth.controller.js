@@ -64,7 +64,7 @@ exports.signup = async (req, res) => {
         console.log(err)
         res.status(500).send({message: 'This service not available', err})
     } finally {
-        // await client.close()
+        await client.close()
     }
 }
 
@@ -110,7 +110,7 @@ exports.signIn = async (req, res) => {
         console.log(err)
         res.status(500).send({message: 'This service not available', err})
     } finally {
-        // await client.close()
+        await client.close()
     }
 }
 
@@ -193,7 +193,7 @@ exports.SendVerifyCode = async (req, res) => {
         console.log(err)
         res.status(500).send({message: 'This service not available', err})
     } finally {
-        // await client.close()
+        await client.close()
     }
 }
 
@@ -229,7 +229,7 @@ exports.verifyEmail = async (req, res) => {
             console.log(err)
             res.status(500).send({message: 'This service not available', err, thai_message: 'ระบบปิดให้บริการ', code: 'server_error'})
         } finally {
-            await client.close()
+            // await client.close()
         }
     })
     
