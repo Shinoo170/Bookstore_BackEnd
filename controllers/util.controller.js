@@ -49,5 +49,21 @@ exports.getExchangeRate = async (req, res) => {
     } finally {
         await client.close()
     }
-    
+}
+
+exports.getDigitalCurrencyRate = async (req ,res) => {
+    try{
+        const symbol = req.params.symbol
+        const url = 'https://api.binance.com/api/v3/ticker/price?symbol=' + symbol
+        console.log(url)
+        await axios.get(url)
+        .then(result => {
+            console.log(result.data)
+        }).catch(err => {
+            console.log(err.message)
+        })
+    } catch (err) {
+        console.log(err)
+        res.status(500).send({message: 'This service not available', err})
+    }
 }

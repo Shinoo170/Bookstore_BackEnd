@@ -304,7 +304,7 @@ exports.placeOrder = async (req, res) => {
     try{
         await client.connect()
         const db = client.db(process.env.DB_NAME)
-        const { amount, method, exchange_rate, shippingFee, cart, selectAddress} = req.body
+        const { amount, method, exchange_rate, crypto_exchange_rate, shippingFee, cart, selectAddress} = req.body
         const date = Date.now()
         const user_id = req.user_id
         const _id = new ObjectId(user_id)
@@ -327,14 +327,20 @@ exports.placeOrder = async (req, res) => {
         var totalPriceSummary = shippingFee
         var refund = 0
         var seriesId = []   // update series sold count
+        var round = 100
+        if(method === 'metamask'){
+            const currency = req.body.currency
+            if(currency === 'ETH'){ round = 100000 }
+            else if(currency === 'BTC'){ round = 100000 }
+        }
         const finalOrder = cart.map((element) => {
             const productIndex = product.findIndex(e => e.productId === element.productId)
             var finalAmount = element.amount
             if(element.amount > product[productIndex].amount){
                 finalAmount = product[productIndex].amount
-                refund += Math.round( ((element.amount - finalAmount) * product[productIndex].price) / exchange_rate * 100) / 100
+                refund += Math.round( ((((element.amount - finalAmount) * product[productIndex].price) / exchange_rate) / crypto_exchange_rate) * round) / round
             }
-            totalPriceSummary +=  Math.round(finalAmount * product[productIndex].price / exchange_rate * 100) / 100
+            totalPriceSummary +=  Math.round( ( (finalAmount * product[productIndex].price / exchange_rate) / crypto_exchange_rate ) * round) / round
             seriesId.push({seriesId: product[productIndex].seriesId, amount: finalAmount})
             return {
                 productId: element.productId,
@@ -357,12 +363,12 @@ exports.placeOrder = async (req, res) => {
             }
         })
 
-        var total = Math.round(amount * 100) / 100
+        var total = Math.round(amount * round) / round
         const orderId = await mongoUtil.getNextSequence(db, 'orderId')
         var orderDetail = {
             orderId,
             user_id,
-            total: Math.round(totalPriceSummary * 100) / 100,
+            total: Math.round(totalPriceSummary * round) / round,
             shippingFee: shippingFee,
             exchange_rate,
             method,
@@ -374,6 +380,7 @@ exports.placeOrder = async (req, res) => {
             status: 'ordered',
         }
         if(method === 'metamask'){
+            orderDetail.crypto_exchange_rate = parseFloat(req.body.crypto_exchange_rate)
             orderDetail.paymentDetails.hash = req.body.hash
             if( refund > 0){
                 orderDetail.paymentDetails.refund = true
@@ -386,13 +393,13 @@ exports.placeOrder = async (req, res) => {
         // ! reset cart
         await db.collection('users').updateOne({ _id }, {
             $push: { order: orderId },
-            $set : {
-                cart: {
-                    list: [],
-                    created: Date.now(),
-                    expired: Date.now() + 7*24*60*60*1000,
-                }
-            }
+            // $set : {
+            //     cart: {
+            //         list: [],
+            //         created: Date.now(),
+            //         expired: Date.now() + 7*24*60*60*1000,
+            //     }
+            // }
         })
         res.send({
             message: 'place order successful',
@@ -487,7 +494,7 @@ exports.placeOrder = async (req, res) => {
 
         }
         else if( method === 'metamask') {
-            const { hash } = req.body
+            const { hash, currency } = req.body
             const chain = EvmChain.BSC_TESTNET
             var refundHash
             var refundTx = null
@@ -510,7 +517,8 @@ exports.placeOrder = async (req, res) => {
                 $set: {
                     paymentDetails: {
                         total,
-                        net: Math.round(totalPriceSummary * 100) / 100,
+                        net: Math.round(totalPriceSummary * round) / round,
+                        currency,
                         hash,
                         created_at: paidDate,
                         date: new Date(paidDate).toLocaleString('no-NO', { hour12: false}),
@@ -529,7 +537,12 @@ exports.placeOrder = async (req, res) => {
                 ]
                 let provider = new ethers.providers.JsonRpcProvider(process.env.BSC_RPC_URLS)
                 let wallet = new ethers.Wallet(process.env.METAMASK_PRIVATE_KEY, provider)
-                let contract = new ethers.Contract(process.env.BUSD_CONTRACT, abi, provider)
+
+                let contract_address = process.env.BUSD_CONTRACT
+                if(currency === 'ETH') contract_address = process.env.ETH_CONTRACT
+                else if(currency === 'BTC') contract_address = process.env.BTC_CONTRACT
+
+                let contract = new ethers.Contract(contract_address, abi, provider)
                 let contractWithSigner = contract.connect(wallet)
                 let refundTotal = ethers.utils.parseUnits(String(refund), 18)
                 // If all order product is out of stock
