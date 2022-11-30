@@ -18,7 +18,7 @@ exports.checkSeries = async (req, res, next) => {
         await client.close()
         res.status(500).send({message: 'This service not available', err})
     } finally {
-        // await client.close()
+        await client.close()
     }
 }
 
@@ -42,7 +42,7 @@ exports.checkProduct = async (req, res, next) => {
         await client.close()
         res.status(500).send({message: 'This service not available', err})
     } finally {
-        // await client.close()
+        await client.close()
     }
 }
 
@@ -64,7 +64,7 @@ exports.checkSeriesNameChange = async (req, res, next) => {
             await client.close()
             res.status(500).send({message: 'This service not available', err})
         } finally {
-            // await client.close()
+            await client.close()
         }
     } else {
         next()
@@ -93,7 +93,7 @@ exports.checkProductNameChange = async (req, res, next) => {
             await client.close()
             return res.status(500).send({message: 'This service not available', err})
         } finally {
-            // await client.close()
+            await client.close()
         }
     } else {
         next()

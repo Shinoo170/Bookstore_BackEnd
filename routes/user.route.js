@@ -1,12 +1,13 @@
 const express = require('express')
 const router = express.Router()
 const authJwt = require('../middleware/authJwt')
+const verify = require('../middleware/userVerify')
 
 const controller  = require('../controllers/user.controller')
 
 router.get('/', authJwt.verifyToken, controller.getUserData)
 
-router.patch('/updateUserData', authJwt.verifyToken, controller.updateUserData)
+router.patch('/updateUserData',[ authJwt.verifyToken, verify.checkTel], controller.updateUserData)
 
 router.patch('/updateUserProfile', authJwt.verifyToken, controller.updateUserProfile)
 
