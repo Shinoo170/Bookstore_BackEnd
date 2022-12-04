@@ -393,13 +393,13 @@ exports.placeOrder = async (req, res) => {
         // ! reset cart
         await db.collection('users').updateOne({ _id }, {
             $push: { order: orderId },
-            // $set : {
-            //     cart: {
-            //         list: [],
-            //         created: Date.now(),
-            //         expired: Date.now() + 7*24*60*60*1000,
-            //     }
-            // }
+            $set : {
+                cart: {
+                    list: [],
+                    created: Date.now(),
+                    expired: Date.now() + 7*24*60*60*1000,
+                }
+            }
         })
         res.send({
             message: 'place order successful',
